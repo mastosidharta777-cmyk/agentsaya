@@ -25,9 +25,7 @@ export function Hero() {
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground text-balance animate-fade-up [animation-delay:100ms]">
-            Masukkan detail bisnis Anda — produk, harga, FAQ — dan dapatkan AI
-            agent yang menjawab pelanggan 24/7 di link chat sendiri. Bayar
-            QRIS, langsung aktif, siap dibagikan & dipasang di website.
+            Masukkan detail bisnis Anda (produk, harga, FAQ). Coba GRATIS 3 Hari, siap dipasang dalam 5 menit di website.
           </p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row animate-fade-up [animation-delay:200ms]">
@@ -69,7 +67,7 @@ export function Hero() {
               {
                 icon: Bot,
                 title: 'AI Agent Terbentuk',
-                body: ' Link: agentku.id/chat/sales-ruko-serpong',
+                body: ' Link: agentsaya.site/chat/sales-ruko-serpong',
                 tone: 'bg-sky-500',
               },
               {

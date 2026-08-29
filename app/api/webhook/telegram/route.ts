@@ -203,7 +203,7 @@ export async function POST(req: NextRequest) {
 
       if (text === '/start') {
         await sendTelegramMessage(
-          '🤖 AgentKu Payment Bot\n\n' +
+          '🤖 Agent Saya Payment Bot\n\n' +
           'I handle payment verification notifications. ' +
           'When a user uploads a receipt, I will notify you here for manual review if needed.'
         );

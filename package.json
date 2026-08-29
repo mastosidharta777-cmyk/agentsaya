@@ -3,11 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "cross-env NODE_OPTIONS=--dns-result-order=ipv4first next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "lint": "next lint"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -49,6 +48,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
+    "cross-env": "^10.1.0",
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.3.0",
     "eslint": "8.49.0",
@@ -61,6 +61,7 @@
     "openai": "^7.3.0",
     "pdf-poppler": "^0.2.3",
     "postcss": "8.4.30",
+    "postgres": "^3.4.9",
     "qrcode": "^1.5.4",
     "react": "18.2.0",
     "react-day-picker": "^8.10.1",

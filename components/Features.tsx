@@ -23,7 +23,7 @@ const FEATURES = [
   {
     icon: Link2,
     title: 'Link shareable',
-    body: 'Setiap agent punya link unik (agentku.id/chat/nama-bisnis). Bagikan ke siapa pun.',
+    body: 'Setiap agent punya link unik (agentsaya.site/chat/nama-bisnis). Bagikan ke siapa pun.',
   },
   {
     icon: Globe,
@@ -38,7 +38,7 @@ const FEATURES = [
   {
     icon: Zap,
     title: 'Aktivasi instan',
-    body: 'Bayar QRIS, agent langsung aktif 30 hari. Link dikirim ke WhatsApp & email.',
+    body: 'Bayar via QRIS/Transfer/E-Wallet, agent langsung aktif 30 hari. Link dikirim ke WhatsApp & email.',
   },
 ];
 
@@ -48,7 +48,7 @@ export function Features() {
       <div className="container">
         <div className="mx-auto mb-12 max-w-2xl text-center">
           <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-primary">
-            Kenapa AgentKu
+            Kenapa Agent Saya
           </p>
           <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
             AI Agent untuk Bisnis Apa Pun

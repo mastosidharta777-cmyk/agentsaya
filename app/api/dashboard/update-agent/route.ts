@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     let knowledgeBase: string = '';
     let agentName: string = '';
     let welcomeMessage: string = '';
+    let telegramChatId: string = '';
     let pdfText: string = '';
     let additionalNotes: string = '';
 
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
       knowledgeBase = formData.get('knowledgeBase') as string || '';
       agentName = formData.get('agentName') as string || '';
       welcomeMessage = formData.get('welcomeMessage') as string || '';
+      telegramChatId = formData.get('telegramChatId') as string || '';
       additionalNotes = formData.get('additionalNotes') as string || '';
       
       // Handle PDF file upload
@@ -96,6 +98,7 @@ export async function POST(req: NextRequest) {
       knowledgeBase = body.knowledgeBase || '';
       agentName = body.agentName || '';
       welcomeMessage = body.welcomeMessage || '';
+      telegramChatId = body.telegramChatId || '';
     }
 
     if (!agentId) {
@@ -171,6 +174,7 @@ export async function POST(req: NextRequest) {
         knowledge_base: safeKnowledgeBase,
         system_prompt: systemPrompt,
         welcome_message: safeWelcomeMessage,
+        telegram_chat_id: telegramChatId || null,
       })
       .eq('id', agentId);
 

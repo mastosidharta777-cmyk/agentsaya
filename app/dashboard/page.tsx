@@ -147,7 +147,7 @@ export default function DashboardPage() {
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
               <Bot className="h-6 w-6 text-primary" />
             </div>
-            <CardTitle className="text-2xl">Dashboard AgentKu</CardTitle>
+            <CardTitle className="text-2xl">Dashboard Agent Saya</CardTitle>
             <p className="text-sm text-muted-foreground">
               Masukkan email atau WhatsApp Anda untuk mengakses dashboard
             </p>

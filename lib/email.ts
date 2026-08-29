@@ -8,7 +8,7 @@
 
 const RESEND_URL = 'https://api.resend.com/emails';
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
-const RESEND_FROM = process.env.RESEND_FROM || 'AgentKu <noreply@agentku.id>';
+const RESEND_FROM = process.env.RESEND_FROM || 'Agent Saya <noreply@agentsaya.site>';
 const SANDBOX = !RESEND_API_KEY;
 
 export interface EmailMessage {
@@ -95,7 +95,7 @@ export function buildAgentWelcomeEmail(opts: {
         <pre style="margin:0;white-space:pre-wrap;word-break:break-all;font-size:12px;color:#334155;background:#fff;padding:12px;border-radius:6px;border:1px solid #e2e8f0">${esc(opts.embedCode)}</pre>
       </div>
       <a href="${opts.chatUrl}" style="display:inline-block;background:#10b981;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;margin:8px 0">Buka AI Agent →</a>
-      <p style="color:#64748b;font-size:13px;margin-top:24px">— Tim AgentKu</p>
+      <p style="color:#64748b;font-size:13px;margin-top:24px">— Tim Agent Saya</p>
     </div>
   </body>
 </html>`;

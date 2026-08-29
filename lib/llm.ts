@@ -1,15 +1,14 @@
 /**
  * LLM completion integration with multi-provider fallback.
  *
- * Primary: Groq (llama-3.1-8b-instant)
- * Fallback: OpenRouter (meta-llama/llama-3.1-8b-instruct:free)
+ * Primary: OpenRouter (openrouter/free)
+ * Fallback: Groq (openai/gpt-oss-20b, groq/compound-mini)
  * 
  * Supports automatic fallback to alternative providers if the primary fails.
  * Without API keys, a sandbox responder echoes the knowledge base back so the chat UI
  * is fully functional for demos. The keys are server-side only — never exposed to the browser.
  */
 
-import Groq from 'groq-sdk';
 import OpenAI from 'openai';
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
@@ -30,26 +29,35 @@ if (!SAMBANOVA_API_KEY) {
 
 const SANDBOX = !GROQ_API_KEY && !OPENROUTER_API_KEY && !SAMBANOVA_API_KEY;
 
-const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
 const OPENROUTER_MODELS = [
-  'google/gemini-2.0-flash-lite-preview-02-05:free',
-  'qwen/qwen-2.5-72b-instruct:free',
-  'meta-llama/llama-3.3-70b-instruct:free',
+  'openrouter/free',
 ];
 const SAMBANOVA_MODELS = [
   'Meta-Llama-3.3-70B-Instruct',
-  'Meta-Llama-3.1-8B-Instruct',
+  'Qwen2.5-72B-Instruct',
+  'DeepSeek-R1-Distill-Llama-70B',
 ];
 
 const GROQ_FALLBACK_MODELS = [
-  'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant',
+  'openai/gpt-oss-20b',
+  'groq/compound-mini',
 ];
 
-const groq = GROQ_API_KEY ? new Groq({ apiKey: GROQ_API_KEY }) : null;
+const groq = GROQ_API_KEY ? new OpenAI({
+  apiKey: GROQ_API_KEY,
+  baseURL: 'https://api.groq.com/openai/v1',
+  defaultHeaders: {
+    'Authorization': `Bearer ${GROQ_API_KEY}`,
+  },
+}) : null;
 const openrouter = OPENROUTER_API_KEY ? new OpenAI({
   apiKey: OPENROUTER_API_KEY,
   baseURL: 'https://openrouter.ai/api/v1',
+  defaultHeaders: {
+    'HTTP-Referer': 'http://localhost:3000',
+    'X-Title': 'Agent Saya',
+  },
 }) : null;
 const sambanova = SAMBANOVA_API_KEY ? new OpenAI({
   apiKey: SAMBANOVA_API_KEY,
@@ -113,7 +121,7 @@ async function tryGroq(messages: any[]): Promise<string> {
       const completion = await groq.chat.completions.create({
         model: model,
         messages: groqMessages,
-        max_tokens: 512,
+        max_tokens: 2000,
         temperature: 0.0,
       });
 
@@ -153,7 +161,7 @@ async function tryOpenRouter(messages: any[]): Promise<string> {
       const completion = await openrouter.chat.completions.create({
         model: model,
         messages: messages,
-        max_tokens: 512,
+        max_tokens: 2000,
         temperature: 0.0,
       });
 
@@ -192,7 +200,7 @@ async function trySambaNova(messages: any[]): Promise<string> {
       const completion = await sambanova.chat.completions.create({
         model: model,
         messages: messages,
-        max_tokens: 512,
+        max_tokens: 2000,
         temperature: 0.0,
       });
 
@@ -246,11 +254,11 @@ ATURAN WAJIB:
   if (openrouter) {
     providers.push({ name: 'OpenRouter', fn: () => tryOpenRouter(messages) });
   }
-  if (sambanova) {
-    providers.push({ name: 'SambaNova', fn: () => trySambaNova(messages) });
-  }
   if (groq) {
     providers.push({ name: 'Groq', fn: () => tryGroq(messages) });
+  }
+  if (sambanova) {
+    providers.push({ name: 'SambaNova', fn: () => trySambaNova(messages) });
   }
 
   if (providers.length === 0) {
@@ -308,11 +316,11 @@ export async function chatComplete(req: LlmRequest): Promise<LlmResult> {
   if (openrouter) {
     providers.push({ name: 'OpenRouter', fn: () => tryOpenRouter(messages) });
   }
-  if (sambanova) {
-    providers.push({ name: 'SambaNova', fn: () => trySambaNova(messages) });
-  }
   if (groq) {
     providers.push({ name: 'Groq', fn: () => tryGroq(messages) });
+  }
+  if (sambanova) {
+    providers.push({ name: 'SambaNova', fn: () => trySambaNova(messages) });
   }
 
   if (providers.length === 0) {

@@ -32,6 +32,9 @@ export function ChatInterface({
   const [trialExpired, setTrialExpired] = useState(false);
   const [trialMessage, setTrialMessage] = useState('');
   const [isTrial, setIsTrial] = useState(false);
+  const [expired, setExpired] = useState(false);
+  const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
+  const [renewalUrl, setRenewalUrl] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -44,6 +47,26 @@ export function ChatInterface({
   useEffect(() => {
     scrollToBottom(false);
   }, []);
+
+  useEffect(() => {
+    async function checkAgentStatus() {
+      try {
+        const res = await fetch(`/api/agent/status?slug=${encodeURIComponent(slug)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.expired) {
+            setExpired(true);
+            setRenewalUrl(data.renewalUrl || '/');
+          }
+          setDaysRemaining(data.daysRemaining ?? null);
+          setIsTrial(data.isTrial || false);
+        }
+      } catch (err) {
+        console.error('Failed to check agent status:', err);
+      }
+    }
+    checkAgentStatus();
+  }, [slug]);
 
   function handleScroll() {
     const el = scrollRef.current;
@@ -80,15 +103,14 @@ export function ChatInterface({
         const errorData = await res.json().catch(() => ({}));
         console.error('Chat API error response:', errorData);
         
-        // Handle trial expiration
-        if (errorData.trialExpired) {
-          setTrialExpired(true);
-          setTrialMessage(errorData.upgradeMessage || 'Masa trial Anda telah berakhir.');
+        if (errorData.expired || errorData.trialExpired) {
+          setExpired(true);
+          setRenewalUrl(errorData.renewalUrl || '/');
           setMessages((prev) => [
             ...prev,
             {
               role: 'assistant',
-              content: errorData.error || 'Masa trial gratis Anda telah berakhir.',
+              content: errorData.error || 'Langganan Anda telah berakhir. Silakan perpanjang.',
             },
           ]);
           setLoading(false);
@@ -207,6 +229,63 @@ export function ChatInterface({
         </div>
       </div>
 
+      {/* Expired lock screen */}
+      {expired && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm">
+          <div className="mx-auto max-w-md px-4 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+              <AlertCircle className="h-8 w-8 text-red-600" />
+            </div>
+            <h2 className="mt-4 text-xl font-bold text-foreground">
+              Langganan Berakhir
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Agent Anda sudah tidak aktif. Perpanjang untuk melanjutkan menggunakan AI Assistant.
+            </p>
+            <Button
+              className="mt-6"
+              onClick={() => {
+                if (renewalUrl) {
+                  window.location.href = renewalUrl;
+                }
+              }}
+            >
+              Perpanjang Sekarang
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Expiring soon warning banner */}
+      {!expired && daysRemaining !== null && daysRemaining <= 1 && (
+        <div className="border-t border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="mx-auto flex max-w-2xl items-start gap-3">
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-none text-amber-600" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-800">
+                {isTrial
+                  ? 'Masa trial gratis akan berakhir dalam 1 hari. Segera upgrade untuk melanjutkan.'
+                  : 'Langganan akan berakhir dalam 1 hari. Segera perpanjang untuk melanjutkan.'}
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <Button
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    if (renewalUrl) {
+                      window.location.href = renewalUrl;
+                    }
+                  }}
+                >
+                  <ArrowUp className="mr-1.5 h-3 w-3" />
+                  {isTrial ? 'Upgrade Sekarang' : 'Perpanjang Sekarang'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Trial expiration banner */}
       {trialExpired && (
         <div className="border-t border-amber-200 bg-amber-50 px-4 py-3">
@@ -251,16 +330,16 @@ export function ChatInterface({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={trialExpired ? 'Masa trial telah berakhir' : 'Tulis pesan…'}
+            placeholder={expired ? 'Langganan telah berakhir' : trialExpired ? 'Masa trial telah berakhir' : 'Tulis pesan…'}
             rows={1}
             className={`max-h-32 resize-none ${isEmbed ? 'min-h-[36px] text-sm' : 'min-h-[44px]'}`}
-            disabled={loading || trialExpired}
+            disabled={loading || expired || trialExpired}
           />
           <Button
             type="submit"
             size="icon"
             className={`flex-none ${isEmbed ? 'h-9 w-9' : 'h-11 w-11'}`}
-            disabled={loading || trialExpired || !input.trim()}
+            disabled={loading || expired || trialExpired || !input.trim()}
           >
             {loading ? (
               <Loader2 className={`${isEmbed ? 'h-4 w-4' : 'h-5 w-5'} animate-spin`} />
@@ -271,7 +350,7 @@ export function ChatInterface({
         </form>
         {!isEmbed && (
           <p className="mx-auto mt-2 max-w-2xl text-center text-xs text-muted-foreground">
-            Dibuat dengan AgentKu · AI bisa membuat kesalahan
+            Dibuat dengan Agent Saya · AI bisa membuat kesalahan
           </p>
         )}
       </div>

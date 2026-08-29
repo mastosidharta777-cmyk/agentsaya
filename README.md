@@ -6,7 +6,10 @@ Platform SaaS RAG Agent untuk Customer Support & Sales Assistant berbasis dokume
 
 - **Framework**: Next.js (App Router) & TypeScript
 - **Backend & Database**: Supabase (Database, Auth, Edge Functions)
-- **AI & LLM Gateway**: OpenRouter (`openai/gpt-4o-mini` & model Gemini Vision)
+- **AI & LLM Gateway**: Multi-Provider Fallback
+  - **OpenRouter**: `google/gemini-2.0-flash-lite-preview-02-05:free`, `qwen/qwen-2.5-72b-instruct:free`, `meta-llama/llama-3.3-70b-instruct:free`
+  - **Groq**: `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`
+  - **SambaNova**: `Meta-Llama-3.3-70B-Instruct`, `Meta-Llama-3.1-8B-Instruct`
 - **Document Extraction**: unpdf (Digital PDF) & OCR.space API (Scan/Foto PDF Fallback)
 
 ## Features
@@ -15,16 +18,25 @@ Platform SaaS RAG Agent untuk Customer Support & Sales Assistant berbasis dokume
 - High-Precision RAG with Strict System Prompts (Zero-Hallucination).
 - Multimodal OCR & Vision AI Support.
 - Fallback Contact Card Triggering.
+- Temperature locked to `0.0` for deterministic output.
+- Multi-provider LLM fallback with automatic retry.
 
 ## Environment Variables
 
 Buat file `.env.local` di root project dan isi dengan:
 
 ```env
+# LLM Providers
 OPENROUTER_API_KEY=...
+GROQ_API_KEY=...
+SAMBANOVA_API_KEY=...
+
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-OCR_SPACE_API_KEY=... # Opsional untuk PDF Scan
+
+# OCR (Opsional untuk PDF Scan)
+OCR_SPACE_API_KEY=...
 ```
 
 ## Setup & Installation
@@ -34,4 +46,21 @@ git clone <repo-url>
 cd AgentKu-main/AgentKu-main
 npm install
 npm run dev
+```
+
+## How It Works
+
+1. **Agent Builder**: User mengisi form nama agent, knowledge base, dan pesan welcome.
+2. **PDF Upload**: User mengunggah price list (PDF/Gambar).
+3. **Extraction**:
+   - PDF digital diekstrak teksnya via `unpdf`.
+   - PDF scan/foto menggunakan fallback OCR.space.
+   - Hasil teks disusun menjadi Clean Markdown Table via OpenRouter Vision/LLM.
+4. **RAG Chat**: User mengobrol dengan agent yang hanya menjawab berdasarkan Knowledge Base dengan guardrail zero-hallucination.
+
+## Default Welcome Message
+
+Template default welcome message:
+```
+Halo! Saya Asisten Virtual {agentName}. Ada yang bisa saya bantu hari ini?
 ```

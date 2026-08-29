@@ -88,6 +88,6 @@ export function buildAgentWelcomeMessage(opts: {
     `Bagikan link ini ke calon pelanggan, atau embed di website Anda.`,
     ``,
     `Butuh bantuan? Balas pesan ini.`,
-    `— Tim AgentKu`,
+    `— Tim Agent Saya`,
   ].join('\n');
 }

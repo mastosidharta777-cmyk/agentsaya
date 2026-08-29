@@ -15,5 +15,5 @@ ALTER TABLE packages ADD CONSTRAINT packages_tier_check
   CHECK (tier IN ('starter','pro','elite','basic'));
 
 INSERT INTO packages (id, tier, name, developer, description, price_monthly, features, pickaxe_url)
-VALUES ('plan-basic', 'basic', 'Basic Plan', 'AgentKu', '1 AI Agent dengan custom knowledge base', 49000, ARRAY['1 AI Agent custom','Knowledge base sendiri','Link shareable','Embed code','Aktif 30 hari'], 'https://agentku.id')
+VALUES ('plan-basic', 'basic', 'Basic Plan', 'Agent Saya', '1 AI Agent dengan custom knowledge base', 49000, ARRAY['1 AI Agent custom','Knowledge base sendiri','Link shareable','Embed code','Aktif 30 hari'], 'https://agentsaya.site')
 ON CONFLICT (id) DO NOTHING;

@@ -1,27 +1,27 @@
 'use client';
 
-import { CreditCard, QrCode, Bot, MessageSquare } from 'lucide-react';
+import { Upload, MessageSquare, Phone, Bell } from 'lucide-react';
 
 const STEPS = [
   {
-    icon: CreditCard,
-    title: 'Isi Detail Bisnis',
-    body: 'Masukkan nama bisnis, knowledge base (produk, harga, FAQ), welcome message, dan kontak Anda.',
-  },
-  {
-    icon: QrCode,
-    title: 'Bayar Rp 49.000 via QRIS',
-    body: 'Scan kode QRIS dengan e-wallet atau m-banking apa pun. AI agent dibuat saat checkout.',
-  },
-  {
-    icon: Bot,
-    title: 'AI Agent Aktif',
-    body: 'Langganan aktif 30 hari. Link chat unik dibuat otomatis (agentku.id/chat/nama-bisnis).',
+    icon: Upload,
+    title: 'Unggah Knowledge Base',
+    body: 'AI mempelajari katalog produk, harga, dan FAQ bisnis Anda.',
   },
   {
     icon: MessageSquare,
-    title: 'Terima Link & Embed',
-    body: 'Link chat + embed code dikirim ke WhatsApp & email Anda. Bagikan atau pasang di website.',
+    title: 'Jawab Pelanggan 24/7',
+    body: 'AI merespons pertanyaan pengunjung web secara instan & akurat.',
+  },
+  {
+    icon: Phone,
+    title: 'Tangkap Data Lead',
+    body: 'AI meminta nama & WhatsApp calon pembeli yang berminat.',
+  },
+  {
+    icon: Bell,
+    title: 'Notifikasi Instan',
+    body: 'Data prospek otomatis masuk ke Dashboard & Email Anda.',
   },
 ];
 

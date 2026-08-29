@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
-import { BASIC_PLAN, TRIAL_PLAN, formatRupiah } from '@/lib/plans';
+import { BASIC_PLAN, TRIAL_PLAN, YEARLY_PLAN, formatRupiah } from '@/lib/plans';
 import { QrisDialog } from './QrisDialog';
 
 interface CheckoutPayload {
@@ -46,7 +46,7 @@ export function AgentBuilderForm() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [referralCode, setReferralCode] = useState<string | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<'trial' | 'paid'>('paid');
+  const [selectedPlan, setSelectedPlan] = useState<'trial' | 'monthly' | 'yearly'>('monthly');
   const [selectedPdfFile, setSelectedPdfFile] = useState<File | null>(null);
 
   useEffect(() => {
@@ -289,6 +289,14 @@ export function AgentBuilderForm() {
         if (data.success === false) {
           throw new Error(data.error || 'Gagal membuat pembayaran');
         }
+
+        // iPaymu returns a redirect Payment URL — send the user straight to it.
+        if (data.paymentUrl) {
+          window.location.href = data.paymentUrl;
+          return;
+        }
+
+        // Fallback to QRIS modal if no redirect URL is provided.
         setPayload(data);
         setDialogOpen(true);
       }
@@ -313,10 +321,10 @@ export function AgentBuilderForm() {
                 </div>
                 <div>
                   <h2 className="font-display text-xl font-bold tracking-tight">
-                    Buat AI Agent Anda
+                    Buat AI Agent
                   </h2>
                   <p className="text-sm text-muted-foreground">
-                    Isi detail bisnis, bayar QRIS, agent langsung aktif.
+                    Isi detail bisnis, bayar via QRIS/Transfer/E-Wallet, agen langsung aktif.
                   </p>
                 </div>
               </div>
@@ -325,10 +333,10 @@ export function AgentBuilderForm() {
                 {/* Plan Selection */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">Pilih Paket</Label>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 relative pt-3">
                     {/* Trial Plan */}
                     <div
-                      className={`relative cursor-pointer rounded-xl border-2 p-4 transition-all ${
+                      className={`relative p-4 rounded-xl border flex flex-col justify-between cursor-pointer transition-all ${
                         selectedPlan === 'trial'
                           ? 'border-primary bg-primary/5'
                           : 'border-border hover:border-primary/50'
@@ -336,55 +344,91 @@ export function AgentBuilderForm() {
                       onClick={() => setSelectedPlan('trial')}
                     >
                       <div className="flex flex-col">
-                        <div className="font-semibold text-lg">Free Trial 3 Hari</div>
-                        <div className="text-sm text-muted-foreground">Coba gratis dulu</div>
-                        <div className="mt-2 text-2xl font-bold text-primary">GRATIS</div>
+                        <div className="font-semibold text-base">Free Trial 3 Hari</div>
+                        <div className="text-xs text-slate-500 mt-1">Coba gratis dulu</div>
+                        <div className="mt-2 text-lg sm:text-xl font-extrabold text-primary">GRATIS</div>
                       </div>
                       <div className="mt-3 space-y-1">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Check className="h-4 w-4 text-primary" />
+                        <div className="flex items-center gap-2 text-xs">
+                          <Check className="h-3.5 w-3.5 text-primary" />
                           <span>Full akses 3 hari</span>
                         </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Check className="h-4 w-4 text-primary" />
+                        <div className="flex items-center gap-2 text-xs">
+                          <Check className="h-3.5 w-3.5 text-primary" />
                           <span>Upgrade kapan saja</span>
                         </div>
                       </div>
                       {selectedPlan === 'trial' && (
-                        <div className="absolute -top-2 -right-2 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-white">
+                        <div className="absolute -top-2.5 right-2 px-2.5 py-0.5 text-[10px] font-bold rounded-full shadow-sm bg-primary text-white">
                           Dipilih
                         </div>
                       )}
                     </div>
 
-                    {/* Paid Plan */}
+                    {/* Monthly Plan */}
                     <div
-                      className={`relative cursor-pointer rounded-xl border-2 p-4 transition-all ${
-                        selectedPlan === 'paid'
+                      className={`relative p-4 rounded-xl border flex flex-col justify-between cursor-pointer transition-all ${
+                        selectedPlan === 'monthly'
                           ? 'border-primary bg-primary/5'
                           : 'border-border hover:border-primary/50'
                       }`}
-                      onClick={() => setSelectedPlan('paid')}
+                      onClick={() => setSelectedPlan('monthly')}
                     >
                       <div className="flex flex-col">
-                        <div className="font-semibold text-lg">Langsung Aktif</div>
-                        <div className="text-sm text-muted-foreground">Aktif 30 hari</div>
-                        <div className="mt-2 text-2xl font-bold text-primary">
+                        <div className="font-semibold text-base">Bulanan</div>
+                        <div className="text-xs text-slate-500 mt-1">Aktif 30 hari</div>
+                        <div className="mt-2 text-lg sm:text-xl font-extrabold text-primary">
                           {formatRupiah(BASIC_PLAN.priceMonthly)}
                         </div>
                       </div>
                       <div className="mt-3 space-y-1">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Check className="h-4 w-4 text-primary" />
+                        <div className="flex items-center gap-2 text-xs">
+                          <Check className="h-3.5 w-3.5 text-primary" />
                           <span>Aktif instan</span>
                         </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Check className="h-4 w-4 text-primary" />
+                        <div className="flex items-center gap-2 text-xs">
+                          <Check className="h-3.5 w-3.5 text-primary" />
                           <span>30 hari penuh</span>
                         </div>
                       </div>
-                      {selectedPlan === 'paid' && (
-                        <div className="absolute -top-2 -right-2 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-white">
+                      {selectedPlan === 'monthly' && (
+                        <div className="absolute -top-2.5 right-2 px-2.5 py-0.5 text-[10px] font-bold rounded-full shadow-sm bg-primary text-white">
+                          Dipilih
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Yearly Plan */}
+                    <div
+                      className={`relative p-4 rounded-xl border flex flex-col justify-between cursor-pointer transition-all ${
+                        selectedPlan === 'yearly'
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                      onClick={() => setSelectedPlan('yearly')}
+                    >
+                      <div className="absolute -top-2.5 right-2 px-2.5 py-0.5 text-[10px] font-bold rounded-full shadow-sm bg-emerald-500 text-white">
+                        Hemat 32%
+                      </div>
+                      <div className="flex flex-col">
+                        <div className="font-semibold text-base">Tahunan</div>
+                        <div className="text-xs text-slate-500 mt-1">Aktif 365 hari</div>
+                        <div className="mt-2 text-lg sm:text-xl font-extrabold text-primary">
+                          {formatRupiah(YEARLY_PLAN.priceMonthly)}
+                        </div>
+                      </div>
+                      <div className="mt-3 space-y-1">
+                        <div className="flex items-center gap-2 text-xs">
+                          <Check className="h-3.5 w-3.5 text-primary" />
+                          <span>Aktif instan</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <Check className="h-3.5 w-3.5 text-primary" />
+                          <span>365 hari penuh</span>
+                        </div>
+                      </div>
+                      {selectedPlan === 'yearly' && (
+                        <div className="absolute -top-2.5 right-2 px-2.5 py-0.5 text-[10px] font-bold rounded-full shadow-sm bg-primary text-white">
                           Dipilih
                         </div>
                       )}
@@ -448,6 +492,9 @@ export function AgentBuilderForm() {
                   />
                   <p className="text-xs text-muted-foreground">
                     Upload file PDF atau TXT untuk menambahkan konteks otomatis
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    💡 Disarankan PDF berbasis teks (tanpa batas halaman, maks 10MB). PDF hasil scan/gambar maksimal 3 halaman.
                   </p>
                   {isExtracting && (
                     <p className="text-xs text-primary flex items-center gap-1">
@@ -571,7 +618,7 @@ export function AgentBuilderForm() {
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {selectedPlan === 'trial' ? 'Membuat Free Trial...' : 'Membuat AI Agent…'}
+                      {selectedPlan === 'trial' ? 'Membuat Free Trial...' : selectedPlan === 'yearly' ? 'Membuat Paket Tahunan...' : 'Membuat AI Agent…'}
                     </>
                   ) : isExtracting ? (
                     <>
@@ -582,6 +629,11 @@ export function AgentBuilderForm() {
                     <>
                       <Sparkles className="mr-2 h-4 w-4" />
                       Mulai Free Trial 3 Hari (GRATIS)
+                    </>
+                  ) : selectedPlan === 'yearly' ? (
+                    <>
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Buat & Aktifkan Paket Tahunan ({formatRupiah(YEARLY_PLAN.priceMonthly)})
                     </>
                   ) : (
                     <>
@@ -598,21 +650,21 @@ export function AgentBuilderForm() {
               <div className="sticky top-24 space-y-4">
                 <div className="rounded-xl border bg-card p-4">
                   <span className="inline-block rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
-                    {selectedPlan === 'trial' ? TRIAL_PLAN.name : BASIC_PLAN.name}
+                    {selectedPlan === 'trial' ? TRIAL_PLAN.name : selectedPlan === 'yearly' ? YEARLY_PLAN.name : BASIC_PLAN.name}
                   </span>
                   <div className="mt-3 flex items-baseline gap-1">
                     <span className="font-display text-3xl font-extrabold tracking-tight">
-                      {selectedPlan === 'trial' ? 'GRATIS' : formatRupiah(BASIC_PLAN.priceMonthly)}
+                      {selectedPlan === 'trial' ? 'GRATIS' : selectedPlan === 'yearly' ? formatRupiah(YEARLY_PLAN.priceMonthly) : formatRupiah(BASIC_PLAN.priceMonthly)}
                     </span>
                     <span className="text-sm text-muted-foreground">
-                      {selectedPlan === 'trial' ? '/3 hari' : '/bln'}
+                      {selectedPlan === 'trial' ? '/3 hari' : selectedPlan === 'yearly' ? '/tahun' : '/bln'}
                     </span>
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    {selectedPlan === 'trial' ? TRIAL_PLAN.description : BASIC_PLAN.description}
+                    {selectedPlan === 'trial' ? TRIAL_PLAN.description : selectedPlan === 'yearly' ? YEARLY_PLAN.description : BASIC_PLAN.description}
                   </p>
                   <ul className="mt-4 space-y-2">
-                    {(selectedPlan === 'trial' ? TRIAL_PLAN.features : BASIC_PLAN.features).map((f) => (
+                    {(selectedPlan === 'trial' ? TRIAL_PLAN.features : selectedPlan === 'yearly' ? YEARLY_PLAN.features : BASIC_PLAN.features).map((f) => (
                       <li key={f} className="flex items-start gap-2 text-sm">
                         <Check className="mt-0.5 h-4 w-4 flex-none text-primary" />
                         <span>{f}</span>
@@ -625,7 +677,7 @@ export function AgentBuilderForm() {
                   <p className="text-xs font-medium text-primary">
                     {selectedPlan === 'trial' 
                       ? 'Aktif instan tanpa pembayaran' 
-                      : 'Aktivasi instan setelah pembayaran QRIS'}
+                      : 'Aktivasi instan setelah pembayaran QRIS/Transfer/E-Wallet'}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Link chat + embed code dikirim via WhatsApp & email

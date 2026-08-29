@@ -19,7 +19,7 @@ const FAQS = [
   },
   {
     q: 'Bagaimana pelanggan mengakses AI agent saya?',
-    a: 'Setiap agent punya link unik seperti agentku.id/chat/nama-bisnis. Bagikan link via WhatsApp, Instagram, atau pasang embed code di website Anda.',
+    a: 'Setiap agent punya link unik seperti agentsaya.site/chat/nama-bisnis. Bagikan link via WhatsApp, Instagram, atau pasang embed code di website Anda.',
   },
   {
     q: 'Berapa lama langganan berlaku?',
@@ -27,7 +27,7 @@ const FAQS = [
   },
   {
     q: 'Bisa untuk bisnis selain properti?',
-    a: 'Ya! AgentKu bekerja untuk bisnis apa pun — kuliner, jasa, retail, konsultan, klinik, dll. Selama Anda bisa mendeskripsikan bisnis di knowledge base, AI bisa menjawab.',
+    a: 'Ya! Agent Saya bekerja untuk bisnis apa pun — kuliner, jasa, retail, konsultan, klinik, dll. Selama Anda bisa mendeskripsikan bisnis di knowledge base, AI bisa menjawab.',
   },
   {
     q: 'Bagaimana AI menjawab pertanyaan di luar knowledge base?',

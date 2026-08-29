@@ -14,18 +14,19 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'AgentKu — AI Sales Agents for Real Estate',
+  title: 'Agent Saya — AI Sales Agents for Real Estate',
   description:
     'Subscribe to a ready-to-deploy AI sales agent tailored for your property project. QRIS checkout, WhatsApp onboarding, and instant access — all automated.',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://agentsaya.site'),
   openGraph: {
-    title: 'AgentKu — AI Sales Agents for Real Estate',
+    title: 'Agent Saya — AI Sales Agents for Real Estate',
     description:
       'Subscribe to a ready-to-deploy AI sales agent tailored for your property project.',
-    images: [{ url: 'https://bolt.new/static/og_default.png' }],
+    images: [{ url: 'https://cdn.phototourl.com/free/2026-08-29-817dc217-a844-44c1-807b-d3aca6484c01.png' }],
   },
   twitter: {
     card: 'summary_large_image',
-    images: [{ url: 'https://bolt.new/static/og_default.png' }],
+    images: [{ url: 'https://cdn.phototourl.com/free/2026-08-29-817dc217-a844-44c1-807b-d3aca6484c01.png' }],
   },
 };
 

@@ -1,4 +1,4 @@
-import { Bot } from 'lucide-react';
+import { Logo } from '@/components/Logo';
 
 export function Footer() {
   return (
@@ -7,10 +7,7 @@ export function Footer() {
         <div className="grid gap-8 md:grid-cols-3">
           <div>
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <Bot className="h-4 w-4" />
-              </div>
-              <span className="font-display text-lg font-bold">AgentKu</span>
+              <Logo className="text-lg" />
             </div>
             <p className="mt-3 max-w-xs text-sm text-secondary-foreground/70">
               AI Sales Agent siap pakai untuk agent & developer properti.
@@ -35,7 +32,7 @@ export function Footer() {
               Kontak
             </h4>
             <ul className="mt-3 space-y-2 text-sm text-secondary-foreground/70">
-              <li>halo@agentku.id</li>
+              <li>halo@agentsaya.site</li>
               <li>+62 812 0000 0000</li>
               <li>Jakarta, Indonesia</li>
             </ul>
@@ -43,7 +40,7 @@ export function Footer() {
         </div>
 
         <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-secondary-foreground/10 pt-6 text-xs text-secondary-foreground/60 sm:flex-row">
-          <p>&copy; {new Date().getFullYear()} AgentKu. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Agent Saya. All rights reserved.</p>
           <p>Dibuat dengan Next.js, Supabase & Tailwind CSS.</p>
         </div>
       </div>

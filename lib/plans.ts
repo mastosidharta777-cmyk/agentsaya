@@ -47,7 +47,26 @@ export const BASIC_PLAN: Plan = {
   highlight: 'Mulai Rp 49.000',
 };
 
-export const PLANS: Plan[] = [TRIAL_PLAN, BASIC_PLAN];
+export const YEARLY_PLAN: Plan = {
+  id: 'yearly',
+  tier: 'yearly',
+  name: 'Paket Tahunan (365 Hari)',
+  description:
+    '1 AI Agent dengan custom knowledge base. Aktif 365 hari, link shareable + embed code.',
+  priceMonthly: 399000,
+  features: [
+    '1 AI Agent custom',
+    'Knowledge base sendiri',
+    'Welcome message custom',
+    'Link chat shareable',
+    'Embed code untuk website',
+    'Aktif 365 hari',
+    'Hemat 32%',
+  ],
+  highlight: 'Hemat 32%',
+};
+
+export const PLANS: Plan[] = [TRIAL_PLAN, BASIC_PLAN, YEARLY_PLAN];
 
 export function formatRupiah(amount: number): string {
   return new Intl.NumberFormat('id-ID', {

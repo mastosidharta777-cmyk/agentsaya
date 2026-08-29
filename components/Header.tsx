@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Bot, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Logo } from '@/components/Logo';
 
 export function Header() {
   const [scrolled, setScrolled] = useState(false);
@@ -31,12 +32,7 @@ export function Header() {
     >
       <div className="container flex h-16 items-center justify-between">
         <a href="#" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
-            <Bot className="h-5 w-5" />
-          </div>
-          <span className="font-display text-xl font-bold tracking-tight">
-            AgentKu
-          </span>
+          <Logo className="text-xl" />
         </a>
 
         <nav className="hidden items-center gap-6 md:flex">

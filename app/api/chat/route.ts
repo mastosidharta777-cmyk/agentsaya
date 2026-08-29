@@ -1,6 +1,12 @@
+if (process.env.NODE_ENV === 'development') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+}
+
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { chatComplete, type ChatTurn } from '@/lib/llm';
+import { sendTelegramMessageToChat } from '@/lib/telegram';
+import { sendEmail } from '@/lib/email';
 
 /**
  * POST /api/chat
@@ -40,7 +46,7 @@ export async function POST(req: NextRequest) {
     // First, try to get agent directly to check if it exists and its status
     const { data: directAgent, error: directError } = await supabaseAdmin
       .from('agents')
-      .select('id, agent_name, payment_status, trial_ends_at, period_end, custom_agent_slug, knowledge_base, system_prompt, welcome_message')
+      .select('id, agent_name, payment_status, trial_ends_at, period_end, custom_agent_slug, knowledge_base, system_prompt, welcome_message, telegram_chat_id, owner_email')
       .eq('custom_agent_slug', slug)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -50,7 +56,7 @@ export async function POST(req: NextRequest) {
     console.log('Direct agent error:', directError);
 
     if (directError) {
-      console.error('Database query error:', directError);
+      console.error('[CHAT ERROR]:', directError);
       return NextResponse.json(
         { error: 'Terjadi kesalahan database. Silakan coba lagi.' },
         { status: 500 }
@@ -100,12 +106,15 @@ export async function POST(req: NextRequest) {
       console.log('Trial expired check:', trialExpired, 'Trial ends at:', directAgent.trial_ends_at);
 
       if (trialExpired) {
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `https://${req.headers.get('host') || 'localhost:3000'}`;
         return NextResponse.json(
           {
             error: 'Masa trial gratis Anda telah berakhir.',
+            expired: true,
             trialExpired: true,
             upgradeMessage: 'Silakan upgrade ke paket berbayar untuk melanjutkan menggunakan AI Agent.',
             slug: directAgent.custom_agent_slug,
+            renewalUrl: `${baseUrl}/checkout?slug=${directAgent.custom_agent_slug}&renewal=true`,
           },
           { status: 403 }
         );
@@ -121,8 +130,13 @@ export async function POST(req: NextRequest) {
       console.log('Subscription expired check:', subscriptionExpired, 'Period ends at:', directAgent.period_end);
 
       if (subscriptionExpired) {
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `https://${req.headers.get('host') || 'localhost:3000'}`;
         return NextResponse.json(
-          { error: 'Langganan Anda telah berakhir. Silakan perpanjang langganan.' },
+          {
+            error: 'Langganan Anda telah berakhir. Silakan perpanjang langganan.',
+            expired: true,
+            renewalUrl: `${baseUrl}/checkout?slug=${directAgent.custom_agent_slug}&renewal=true`,
+          },
           { status: 403 }
         );
       }
@@ -171,6 +185,110 @@ export async function POST(req: NextRequest) {
     }
 
     console.log('Chat complete result:', result);
+
+    try {
+      await supabaseAdmin
+        .from('chat_logs')
+        .insert({
+          agent_id: directAgent.id,
+          user_message: message,
+          ai_reply: result.reply,
+          metadata: {
+            history: Array.isArray(history) ? history : [],
+            sandbox: result.sandbox,
+          },
+        });
+    } catch (logErr) {
+      console.error('[CHAT LOG] Failed to save chat log:', logErr);
+    }
+
+    // Lead detection: check if user message contains phone/WhatsApp number
+    const phoneRegex = /(\+62|62|08)\d{8,11}/g;
+    const phoneMatch = message.match(phoneRegex);
+
+    if (phoneMatch && directAgent.telegram_chat_id) {
+      const detectedPhone = phoneMatch[0];
+      const cleanPhone = detectedPhone.replace(/^\+?62/, '0').replace(/^0+/, '0');
+
+      // Simple name extraction heuristic
+      let customerName = 'Pengguna Chat';
+      const nameMatch = message.match(/(?:nama\s*saya|saya\s*)\s*([A-Z][a-z]{1,20}(?:\s+[A-Z][a-z]{1,20})?)/i);
+      if (nameMatch && nameMatch[1]) {
+        customerName = nameMatch[1].trim();
+      }
+
+      const messageSummary = message.length > 200 ? message.substring(0, 200) + '...' : message;
+
+      // Save lead to database
+      const { error: leadError } = await supabaseAdmin
+        .from('leads')
+        .insert({
+          agent_id: directAgent.id,
+          customer_name: customerName,
+          customer_phone: cleanPhone,
+          message_summary: messageSummary,
+          source: 'chat',
+        });
+
+      if (leadError) {
+        console.error('[LEAD] Failed to save lead:', leadError);
+      } else {
+        console.log('[LEAD] New lead saved:', cleanPhone, customerName);
+
+        // Send Telegram notification
+        const telegramMessage =
+          '🎯 *Lead Baru Terdeteksi!*\n\n' +
+          `👤 *Nama:* ${customerName}\n` +
+          `📱 *WhatsApp:* ${cleanPhone}\n` +
+          `💬 *Pesan/Kebutuhan:* ${messageSummary}\n\n` +
+          `Agent: ${directAgent.agent_name}`;
+
+        const telegramResult = await sendTelegramMessageToChat(
+          directAgent.telegram_chat_id,
+          telegramMessage,
+          { parseMode: 'Markdown' }
+        );
+
+        if (telegramResult.success) {
+          console.log('[LEAD] Telegram notification sent successfully');
+        } else {
+          console.error('[LEAD] Telegram notification failed:', telegramResult.error);
+        }
+
+        const esc = (s: string) =>
+          s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const emailHtml = `<!DOCTYPE html>
+<html>
+  <body style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a">
+    <div style="background:#6366f1;color:#fff;padding:20px 24px;border-radius:12px 12px 0 0">
+      <h1 style="margin:0;font-size:22px">🎯 Lead Baru Terdeteksi - Agent Saya</h1>
+    </div>
+    <div style="border:1px solid #e2e8f0;border-top:none;padding:24px;border-radius:0 0 12px 12px">
+      <p>Halo <strong>${esc(directAgent.agent_name)}</strong>,</p>
+      <p>Ada calon pelanggan baru yang terdeteksi dari chat AI Agent Anda.</p>
+      <table style="width:100%;margin:16px 0;border-collapse:collapse">
+        <tr><td style="padding:8px 0;color:#64748b">Nama</td><td style="padding:8px 0;text-align:right;font-weight:600">${esc(customerName)}</td></tr>
+        <tr><td style="padding:8px 0;color:#64748b;border-top:1px solid #f1f5f9">WhatsApp</td><td style="padding:8px 0;text-align:right;font-weight:600;border-top:1px solid #f1f5f9"><a href="https://wa.me/${esc(cleanPhone)}" style="color:#6366f1;text-decoration:none">${esc(cleanPhone)}</a></td></tr>
+        <tr><td style="padding:8px 0;color:#64748b;border-top:1px solid #f1f5f9">Pesan / Kebutuhan</td><td style="padding:8px 0;text-align:right;font-weight:600;border-top:1px solid #f1f5f9">${esc(messageSummary)}</td></tr>
+      </table>
+      <p style="color:#64748b;font-size:13px;margin-top:24px">— Tim Agent Saya</p>
+    </div>
+  </body>
+</html>`;
+
+        const emailResult = await sendEmail({
+          to: directAgent.owner_email,
+          subject: '🎯 Lead Baru Terdeteksi - Agent Saya',
+          html: emailHtml,
+        });
+
+        if (emailResult.success) {
+          console.log('[LEAD] Email notification sent to', directAgent.owner_email);
+        } else {
+          console.error('[LEAD] Email notification failed:', emailResult.error);
+        }
+      }
+    }
 
     return NextResponse.json({
       reply: result.reply,

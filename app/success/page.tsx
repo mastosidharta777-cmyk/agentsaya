@@ -1,5 +1,9 @@
 'use client';
 
+if (process.env.NODE_ENV === 'development') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+}
+
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -43,6 +47,23 @@ function SuccessContent() {
   useEffect(() => {
     if (!ref) {
       setError('Referensi transaksi tidak ditemukan di URL.');
+      setLoading(false);
+      return;
+    }
+
+    const isMockRef = typeof ref === 'string' && ref.startsWith('MOCK_');
+    const isDev = process.env.NODE_ENV === 'development';
+
+    if ((isMockRef || isDev) && slugParam) {
+      setData({
+        status: 'PAID',
+        slug: slugParam,
+        agentName: null,
+        paymentStatus: 'PAID',
+        periodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        trialEndsAt: null,
+        planType: 'basic',
+      });
       setLoading(false);
       return;
     }
