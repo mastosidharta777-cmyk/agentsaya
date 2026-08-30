@@ -78,6 +78,7 @@ export function AgentBuilderForm() {
 
   async function extractTextFromFile(file: File): Promise<string> {
     const extension = file.name.split('.').pop()?.toLowerCase();
+    const isImage = file.type.startsWith('image/');
     
     if (extension === 'txt') {
       try {
@@ -122,8 +123,45 @@ export function AgentBuilderForm() {
         }
         throw new Error('Gagal membaca file PDF');
       }
+    } else if (isImage) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch('/api/extract-image', {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error('Image OCR API error:', errorText);
+          try {
+            const errorData = JSON.parse(errorText);
+            throw new Error(errorData.error || 'Gagal membaca teks dari gambar');
+          } catch {
+            throw new Error('Gagal membaca teks dari gambar');
+          }
+        }
+        
+        const data = await res.json();
+        return data.text;
+      } catch (err) {
+        if (err instanceof Error) {
+          if (err.name === 'AbortError') {
+            throw new Error('Gagal membaca gambar: timeout');
+          }
+          throw err;
+        }
+        throw new Error('Gagal membaca gambar');
+      }
     } else {
-      throw new Error('Unsupported file type. Please upload PDF or TXT files.');
+      throw new Error('Unsupported file type. Please upload PDF, TXT, or image files.');
     }
   }
 
@@ -133,16 +171,28 @@ export function AgentBuilderForm() {
 
     const validFiles = files.filter(file => {
       const extension = file.name.split('.').pop()?.toLowerCase();
-      return extension === 'pdf' || extension === 'txt';
+      const isImage = file.type.startsWith('image/');
+      return extension === 'pdf' || extension === 'txt' || isImage;
     });
 
     if (validFiles.length !== files.length) {
-      setError('Some files were skipped. Only PDF and TXT files are supported.');
+      setError('Some files were skipped. Only PDF, TXT, and image files are supported.');
     }
 
-    const pdfFile = validFiles.find(file => file.name.split('.').pop()?.toLowerCase() === 'pdf');
+    const pdfFile = validFiles.find(file => {
+      const extension = file.name.split('.').pop()?.toLowerCase();
+      return extension === 'pdf' || file.type.startsWith('image/');
+    });
     if (pdfFile) {
       setSelectedPdfFile(pdfFile);
+    }
+
+    const oversizedPdf = validFiles.find(file => {
+      const extension = file.name.split('.').pop()?.toLowerCase();
+      return extension === 'pdf' && file.size > 1048576;
+    });
+    if (oversizedPdf) {
+      setError('File PDF scan di atas 1 MB. Disarankan upload screenshot gambar (JPG/PNG) atau tempel teksnya langsung.');
     }
 
     setUploadedFiles(prev => [...prev, ...validFiles]);
@@ -154,8 +204,8 @@ export function AgentBuilderForm() {
       setExtractedText(prev => prev + '\n\n' + texts.join('\n\n'));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to extract text from files';
-      setPdfExtractError('Gagal membaca file PDF, silakan masukkan teks manual');
-      console.error('[PDF EXTRACT]', message);
+      setPdfExtractError('Gagal membaca file, silakan masukkan teks manual');
+      console.error('[FILE EXTRACT]', message);
     } finally {
       setIsExtracting(false);
     }
@@ -166,13 +216,18 @@ export function AgentBuilderForm() {
     const remainingFiles = uploadedFiles.filter((_, i) => i !== index);
     setUploadedFiles(remainingFiles);
     
-    if (removedFile.name.split('.').pop()?.toLowerCase() === 'pdf') {
+    const removedExt = removedFile.name.split('.').pop()?.toLowerCase();
+    const removedIsImage = removedFile.type.startsWith('image/');
+    if (removedExt === 'pdf' || removedIsImage) {
       setSelectedPdfFile(null);
     }
     
-    const nextPdfFile = remainingFiles.find(file => file.name.split('.').pop()?.toLowerCase() === 'pdf');
-    if (nextPdfFile) {
-      setSelectedPdfFile(nextPdfFile);
+    const nextDocFile = remainingFiles.find(file => {
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      return ext === 'pdf' || file.type.startsWith('image/');
+    });
+    if (nextDocFile) {
+      setSelectedPdfFile(nextDocFile);
     }
     
     if (remainingFiles.length > 0) {
@@ -183,8 +238,8 @@ export function AgentBuilderForm() {
         setExtractedText(texts.join('\n\n'));
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to re-extract text';
-        setPdfExtractError('Gagal membaca file PDF, silakan masukkan teks manual');
-        console.error('[PDF RE-EXTRACT]', message);
+        setPdfExtractError('Gagal membaca file, silakan masukkan teks manual');
+        console.error('[FILE RE-EXTRACT]', message);
       } finally {
         setIsExtracting(false);
       }
@@ -224,7 +279,7 @@ export function AgentBuilderForm() {
     
     console.log('Combined context length:', combinedContext.length);
     console.log('Uploaded files count:', uploadedFiles.length);
-    console.log('Has PDF file:', selectedPdfFile !== null);
+    console.log('Has document file:', selectedPdfFile !== null);
     console.log('Has extracted text:', extractedText.length > 0);
     
     // Skip character validation if files are uploaded or PDF is selected
@@ -249,10 +304,10 @@ export function AgentBuilderForm() {
       }
       formData.append('planType', selectedPlan);
       
-      // Append PDF file if selected
+      // Append document file if selected
       if (selectedPdfFile) {
         formData.append('pdfFile', selectedPdfFile);
-        console.log('Appending PDF file to FormData:', selectedPdfFile.name);
+        console.log('Appending document file to FormData:', selectedPdfFile.name);
       }
 
       // For trial plan, directly create agent without payment
@@ -496,22 +551,22 @@ export function AgentBuilderForm() {
                   <Label htmlFor="fileUpload">
                     <span className="flex items-center gap-1.5">
                       <Upload className="h-3.5 w-3.5" />
-                      Upload PDF/TXT (Opsional)
+                      Upload PDF/TXT/Gambar (Opsional)
                     </span>
                   </Label>
                   <Input
                     id="fileUpload"
                     type="file"
-                    accept=".pdf,.txt"
+                    accept=".pdf,.txt,image/*"
                     multiple
                     onChange={handleFileUpload}
                     className="cursor-pointer"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Upload file PDF atau TXT untuk menambahkan konteks otomatis
+                    Upload file PDF, TXT, atau Gambar (JPG/PNG/WEBP) untuk menambahkan konteks otomatis
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    💡 Disarankan PDF berbasis teks (tanpa batas halaman, maks 10MB). PDF hasil scan/gambar maksimal 3 halaman.
+                    💡 Disarankan PDF berbasis teks (tanpa batas halaman, maks 10MB). PDF hasil scan/gambar di atas 1 MB disarankan gunakan screenshot JPG/PNG atau tempel teks manual.
                   </p>
                   {isExtracting && (
                     <p className="text-xs text-primary flex items-center gap-1">

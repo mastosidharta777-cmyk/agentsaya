@@ -18,8 +18,10 @@ async function tryOcrSpace(file: File): Promise<string> {
     return '';
   }
 
+  const blob = new Blob([await file.arrayBuffer()], { type: file.type || 'application/pdf' });
+
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('file', blob, 'file.pdf');
   formData.append('language', 'ind');
   formData.append('isOverlayRequired', 'false');
   formData.append('detectOrientation', 'true');
@@ -35,10 +37,28 @@ async function tryOcrSpace(file: File): Promise<string> {
   });
 
   if (!res.ok) {
+    const detail = await res.text();
+    console.error('OCR Error detail:', detail);
     throw new Error(`OCR.space API error: ${res.status}`);
   }
 
-  const data = await res.json();
+  const raw = await res.text();
+  console.log('OCR API Raw Response:', raw);
+
+  let data: any;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    throw new Error('Gagal membaca respons OCR.space');
+  }
+
+  if (data.IsErroredOnProcessing === true) {
+    const message = Array.isArray(data.ErrorMessage)
+      ? data.ErrorMessage[0]
+      : data.ErrorMessage || 'OCR processing error';
+    throw new Error(message);
+  }
+
   if (data.ParsedResults && data.ParsedResults.length > 0) {
     return data.ParsedResults[0].ParsedText || '';
   }
@@ -89,6 +109,12 @@ export async function POST(req: NextRequest) {
 
     if (!fullText || fullText.trim().length < MIN_TEXT_LENGTH) {
       console.log('[PDF EXTRACT] Text too short, trying OCR fallback');
+      if (file.size > 1048576) {
+        return NextResponse.json(
+          { error: 'PDF berbasis gambar ini ukurannya melebihi batas OCR gratis (maksimal 1 MB). Silakan upload file < 1 MB atau tempel teks manual.' },
+          { status: 422 }
+        );
+      }
       try {
         const ocrText = await withTimeout(tryOcrSpace(file), 45000);
         if (ocrText && ocrText.trim().length > 0) {
