@@ -506,7 +506,6 @@ export function AgentBuilderForm() {
                     multiple
                     onChange={handleFileUpload}
                     className="cursor-pointer"
-                    disabled={isExtracting}
                   />
                   <p className="text-xs text-muted-foreground">
                     Upload file PDF atau TXT untuk menambahkan konteks otomatis
@@ -533,16 +532,15 @@ export function AgentBuilderForm() {
                           className="flex items-center justify-between rounded-md border bg-muted/50 px-3 py-2 text-sm"
                         >
                           <span className="truncate flex-1">{file.name}</span>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0"
-                            onClick={() => removeFile(index)}
-                            disabled={isExtracting}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
+                           <Button
+                             type="button"
+                             variant="ghost"
+                             size="sm"
+                             className="h-6 w-6 p-0"
+                             onClick={() => removeFile(index)}
+                           >
+                             <X className="h-4 w-4" />
+                           </Button>
                         </div>
                       ))}
                     </div>
@@ -636,17 +634,12 @@ export function AgentBuilderForm() {
                   type="submit"
                   size="lg"
                   className="w-full font-semibold"
-                  disabled={loading || isExtracting}
+                  disabled={loading}
                 >
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {selectedPlan === 'trial' ? 'Membuat Free Trial...' : selectedPlan === 'yearly' ? 'Membuat Paket Tahunan...' : 'Membuat AI Agent…'}
-                    </>
-                  ) : isExtracting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Mengekstrak teks dari file…
+                      {selectedPlan === 'trial' ? 'Mulai Free Trial 3 Hari (GRATIS)' : selectedPlan === 'yearly' ? `Buat & Aktifkan Paket Tahunan (${formatRupiah(YEARLY_PLAN.priceMonthly)})` : `Buat & Aktifkan AI Agent (${formatRupiah(BASIC_PLAN.priceMonthly)})`}
                     </>
                   ) : selectedPlan === 'trial' ? (
                     <>
