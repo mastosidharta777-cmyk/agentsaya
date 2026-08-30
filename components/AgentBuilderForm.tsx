@@ -87,12 +87,18 @@ export function AgentBuilderForm() {
       }
     } else if (extension === 'pdf') {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        
         const formData = new FormData();
         formData.append('file', file);
         const res = await fetch('/api/extract-pdf', {
           method: 'POST',
           body: formData,
+          signal: controller.signal,
         });
+        
+        clearTimeout(timeoutId);
         
         if (!res.ok) {
           const errorText = await res.text();
@@ -109,6 +115,9 @@ export function AgentBuilderForm() {
         return data.text;
       } catch (err) {
         if (err instanceof Error) {
+          if (err.name === 'AbortError') {
+            throw new Error('Gagal membaca file PDF: timeout');
+          }
           throw err;
         }
         throw new Error('Gagal membaca file PDF');

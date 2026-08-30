@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractText } from 'unpdf';
 
-/**
- * POST /api/extract-pdf
- * Extracts text from uploaded PDF files
- */
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('PDF extraction timeout')), ms)
+  );
+  return Promise.race([promise, timeout]);
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -24,17 +29,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: 'File terlalu besar. Maksimal 10MB.' },
+        { status: 400 }
+      );
+    }
+
     const arrayBuffer = await file.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
 
-    const { text } = await extractText(uint8Array);
-    // unpdf returns text as array of strings (one per page), join them
+    const { text } = await withTimeout(
+      extractText(uint8Array),
+      25000
+    );
     const textArray = Array.isArray(text) ? text : [text];
     const fullText = textArray.join('\n\n');
 
     return NextResponse.json({ text: fullText });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error('[PDF EXTRACT]', message);
+    return NextResponse.json(
+      { error: message || 'Gagal mengekstrak teks PDF' },
+      { status: 500 }
+    );
   }
 }
