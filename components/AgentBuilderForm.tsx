@@ -48,6 +48,7 @@ export function AgentBuilderForm() {
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<'trial' | 'monthly' | 'yearly'>('monthly');
   const [selectedPdfFile, setSelectedPdfFile] = useState<File | null>(null);
+  const [pdfExtractError, setPdfExtractError] = useState<string | null>(null);
 
   useEffect(() => {
     const ref = searchParams.get('ref');
@@ -79,28 +80,39 @@ export function AgentBuilderForm() {
     const extension = file.name.split('.').pop()?.toLowerCase();
     
     if (extension === 'txt') {
-      return await file.text();
-    } else if (extension === 'pdf') {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch('/api/extract-pdf', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error('PDF extraction API error:', errorText);
-        try {
-          const errorData = JSON.parse(errorText);
-          throw new Error(errorData.error || 'Failed to extract PDF text');
-        } catch {
-          throw new Error('Failed to extract PDF text');
-        }
+      try {
+        return await file.text();
+      } catch (err) {
+        throw new Error('Gagal membaca file TXT');
       }
-      
-      const data = await res.json();
-      return data.text;
+    } else if (extension === 'pdf') {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch('/api/extract-pdf', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error('PDF extraction API error:', errorText);
+          try {
+            const errorData = JSON.parse(errorText);
+            throw new Error(errorData.error || 'Gagal mengekstrak teks PDF');
+          } catch {
+            throw new Error('Gagal mengekstrak teks PDF');
+          }
+        }
+        
+        const data = await res.json();
+        return data.text;
+      } catch (err) {
+        if (err instanceof Error) {
+          throw err;
+        }
+        throw new Error('Gagal membaca file PDF');
+      }
     } else {
       throw new Error('Unsupported file type. Please upload PDF or TXT files.');
     }
@@ -119,57 +131,54 @@ export function AgentBuilderForm() {
       setError('Some files were skipped. Only PDF and TXT files are supported.');
     }
 
-    // Set the first PDF file as the selected PDF file for backend upload
     const pdfFile = validFiles.find(file => file.name.split('.').pop()?.toLowerCase() === 'pdf');
     if (pdfFile) {
       setSelectedPdfFile(pdfFile);
     }
 
     setUploadedFiles(prev => [...prev, ...validFiles]);
+    setPdfExtractError(null);
 
-    // Extract text from each file
     setIsExtracting(true);
     try {
       const texts = await Promise.all(validFiles.map(extractTextFromFile));
       setExtractedText(prev => prev + '\n\n' + texts.join('\n\n'));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to extract text from files';
-      setError(message);
+      setPdfExtractError('Gagal membaca file PDF, silakan masukkan teks manual');
+      console.error('[PDF EXTRACT]', message);
     } finally {
       setIsExtracting(false);
     }
   }
 
-  function removeFile(index: number) {
+  async function removeFile(index: number) {
     const removedFile = uploadedFiles[index];
     const remainingFiles = uploadedFiles.filter((_, i) => i !== index);
     setUploadedFiles(remainingFiles);
     
-    // Clear selectedPdfFile if the removed file is a PDF
     if (removedFile.name.split('.').pop()?.toLowerCase() === 'pdf') {
       setSelectedPdfFile(null);
     }
     
-    // Update selectedPdfFile to the next PDF if available
     const nextPdfFile = remainingFiles.find(file => file.name.split('.').pop()?.toLowerCase() === 'pdf');
     if (nextPdfFile) {
       setSelectedPdfFile(nextPdfFile);
     }
     
-    // Re-extract text from remaining files to keep extractedText in sync
     if (remainingFiles.length > 0) {
       setIsExtracting(true);
-      Promise.all(remainingFiles.map(extractTextFromFile))
-        .then(texts => {
-          setExtractedText(texts.join('\n\n'));
-        })
-        .catch(err => {
-          const message = err instanceof Error ? err.message : 'Failed to re-extract text';
-          setError(message);
-        })
-        .finally(() => {
-          setIsExtracting(false);
-        });
+      setPdfExtractError(null);
+      try {
+        const texts = await Promise.all(remainingFiles.map(extractTextFromFile));
+        setExtractedText(texts.join('\n\n'));
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to re-extract text';
+        setPdfExtractError('Gagal membaca file PDF, silakan masukkan teks manual');
+        console.error('[PDF RE-EXTRACT]', message);
+      } finally {
+        setIsExtracting(false);
+      }
     } else {
       setExtractedText('');
     }
@@ -346,7 +355,7 @@ export function AgentBuilderForm() {
                       <div className="flex flex-col">
                         <div className="font-semibold text-base">Free Trial 3 Hari</div>
                         <div className="text-xs text-slate-500 mt-1">Coba gratis dulu</div>
-                        <div className="mt-2 text-lg sm:text-xl font-extrabold text-primary">GRATIS</div>
+                        <div className="mt-2 text-lg sm:text-xl font-extrabold text-primary truncate">GRATIS</div>
                       </div>
                       <div className="mt-3 space-y-1">
                         <div className="flex items-center gap-2 text-xs">
@@ -377,7 +386,7 @@ export function AgentBuilderForm() {
                       <div className="flex flex-col">
                         <div className="font-semibold text-base">Bulanan</div>
                         <div className="text-xs text-slate-500 mt-1">Aktif 30 hari</div>
-                        <div className="mt-2 text-lg sm:text-xl font-extrabold text-primary">
+                        <div className="mt-2 text-lg sm:text-xl font-extrabold text-primary truncate">
                           {formatRupiah(BASIC_PLAN.priceMonthly)}
                         </div>
                       </div>
@@ -413,7 +422,7 @@ export function AgentBuilderForm() {
                       <div className="flex flex-col">
                         <div className="font-semibold text-base">Tahunan</div>
                         <div className="text-xs text-slate-500 mt-1">Aktif 365 hari</div>
-                        <div className="mt-2 text-lg sm:text-xl font-extrabold text-primary">
+                        <div className="mt-2 text-lg sm:text-xl font-extrabold text-primary truncate">
                           {formatRupiah(YEARLY_PLAN.priceMonthly)}
                         </div>
                       </div>
@@ -428,7 +437,7 @@ export function AgentBuilderForm() {
                         </div>
                       </div>
                       {selectedPlan === 'yearly' && (
-                        <div className="absolute -top-2.5 right-2 px-2.5 py-0.5 text-[10px] font-bold rounded-full shadow-sm bg-primary text-white">
+                        <div className="absolute -top-2.5 right-16 px-2.5 py-0.5 text-[10px] font-bold rounded-full shadow-sm bg-primary text-white">
                           Dipilih
                         </div>
                       )}
@@ -500,6 +509,11 @@ export function AgentBuilderForm() {
                     <p className="text-xs text-primary flex items-center gap-1">
                       <Loader2 className="h-3 w-3 animate-spin" />
                       Mengekstrak teks dari file...
+                    </p>
+                  )}
+                  {pdfExtractError && (
+                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
+                      {pdfExtractError}
                     </p>
                   )}
                   {uploadedFiles.length > 0 && (
@@ -653,7 +667,7 @@ export function AgentBuilderForm() {
                     {selectedPlan === 'trial' ? TRIAL_PLAN.name : selectedPlan === 'yearly' ? YEARLY_PLAN.name : BASIC_PLAN.name}
                   </span>
                   <div className="mt-3 flex items-baseline gap-1">
-                    <span className="font-display text-3xl font-extrabold tracking-tight">
+                    <span className="font-display text-3xl font-extrabold tracking-tight truncate">
                       {selectedPlan === 'trial' ? 'GRATIS' : selectedPlan === 'yearly' ? formatRupiah(YEARLY_PLAN.priceMonthly) : formatRupiah(BASIC_PLAN.priceMonthly)}
                     </span>
                     <span className="text-sm text-muted-foreground">

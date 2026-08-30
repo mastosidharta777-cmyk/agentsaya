@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bot, Copy, Check, Calendar, Gift, LogOut, Edit, Save, X } from 'lucide-react';
+import { Bot, Copy, Check, Calendar, Gift, LogOut, Edit, Save, X, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,10 +22,22 @@ interface Agent {
   total_referred?: number;
 }
 
+interface Lead {
+  id: string;
+  agent_id: string;
+  customer_name: string;
+  customer_phone: string;
+  message_summary: string;
+  source: string;
+  created_at: string;
+}
+
 export default function DashboardPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [contact, setContact] = useState('');
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loadingLeads, setLoadingLeads] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -60,11 +72,32 @@ export default function DashboardPage() {
       const data = await res.json();
       setAgents(data.agents);
       setIsAuthenticated(true);
+      await fetchLeads(data.agents);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Authentication failed';
       setError(message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLeads = async (agentList: Agent[]) => {
+    setLoadingLeads(true);
+    try {
+      const res = await fetch('/api/dashboard/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contact }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setLeads(data.leads || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch leads:', err);
+    } finally {
+      setLoadingLeads(false);
     }
   };
 
@@ -331,6 +364,71 @@ export default function DashboardPage() {
                 </Card>
               );
             })}
+          </div>
+
+          {/* Leads Section */}
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Daftar Lead / Calon Pembeli
+            </h2>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Lead dari Chat AI Agent</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Calon pembeli yang menunjukkan minat melalui chat
+                </p>
+              </CardHeader>
+              <CardContent>
+                {loadingLeads ? (
+                  <p className="text-sm text-muted-foreground">Memuat leads...</p>
+                ) : leads.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Belum ada lead yang terdeteksi.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-2 px-2 font-medium text-muted-foreground">Tanggal</th>
+                          <th className="text-left py-2 px-2 font-medium text-muted-foreground">Nama</th>
+                          <th className="text-left py-2 px-2 font-medium text-muted-foreground">WA</th>
+                          <th className="text-left py-2 px-2 font-medium text-muted-foreground">Ringkasan Minat</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {leads.map((lead) => (
+                          <tr key={lead.id} className="border-b last:border-0">
+                            <td className="py-2 px-2">
+                              {new Date(lead.created_at).toLocaleDateString('id-ID', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </td>
+                            <td className="py-2 px-2 font-medium">{lead.customer_name}</td>
+                            <td className="py-2 px-2">
+                              <a
+                                href={`https://wa.me/${lead.customer_phone.replace(/^0/, '62')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline"
+                              >
+                                {lead.customer_phone}
+                              </a>
+                            </td>
+                            <td className="py-2 px-2 text-muted-foreground max-w-xs truncate">
+                              {lead.message_summary}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Referral Program Section */}

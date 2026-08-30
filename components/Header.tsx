@@ -20,6 +20,7 @@ export function Header() {
     { label: 'Fitur', href: '#features' },
     { label: 'Cara Kerja', href: '#how' },
     { label: 'FAQ', href: '#faq' },
+    { label: 'Dashboard', href: '/dashboard' },
   ];
 
   return (
