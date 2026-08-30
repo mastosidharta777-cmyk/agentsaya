@@ -345,7 +345,7 @@ export function AgentBuilderForm() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 relative pt-3">
                     {/* Trial Plan */}
                     <div
-                      className={`relative p-4 rounded-xl border flex flex-col justify-between cursor-pointer transition-all ${
+                      className={`relative p-4 sm:p-5 rounded-xl border flex flex-col justify-between cursor-pointer transition-all ${
                         selectedPlan === 'trial'
                           ? 'border-primary bg-primary/5'
                           : 'border-border hover:border-primary/50'
@@ -355,7 +355,7 @@ export function AgentBuilderForm() {
                       <div className="flex flex-col">
                         <div className="font-semibold text-base">Free Trial 3 Hari</div>
                         <div className="text-xs text-slate-500 mt-1">Coba gratis dulu</div>
-                        <div className="mt-2 text-lg sm:text-xl font-extrabold text-primary truncate">GRATIS</div>
+                        <div className="mt-2 text-lg sm:text-xl font-extrabold text-primary">GRATIS</div>
                       </div>
                       <div className="mt-3 space-y-1">
                         <div className="flex items-center gap-2 text-xs">
@@ -376,7 +376,7 @@ export function AgentBuilderForm() {
 
                     {/* Monthly Plan */}
                     <div
-                      className={`relative p-4 rounded-xl border flex flex-col justify-between cursor-pointer transition-all ${
+                      className={`relative p-4 sm:p-5 rounded-xl border flex flex-col justify-between cursor-pointer transition-all ${
                         selectedPlan === 'monthly'
                           ? 'border-primary bg-primary/5'
                           : 'border-border hover:border-primary/50'
@@ -386,7 +386,7 @@ export function AgentBuilderForm() {
                       <div className="flex flex-col">
                         <div className="font-semibold text-base">Bulanan</div>
                         <div className="text-xs text-slate-500 mt-1">Aktif 30 hari</div>
-                        <div className="mt-2 text-lg sm:text-xl font-extrabold text-primary truncate">
+                        <div className="mt-2 text-base sm:text-lg font-bold text-primary">
                           {formatRupiah(BASIC_PLAN.priceMonthly)}
                         </div>
                       </div>
@@ -409,7 +409,7 @@ export function AgentBuilderForm() {
 
                     {/* Yearly Plan */}
                     <div
-                      className={`relative p-4 rounded-xl border flex flex-col justify-between cursor-pointer transition-all ${
+                      className={`relative p-4 sm:p-5 rounded-xl border flex flex-col justify-between cursor-pointer transition-all ${
                         selectedPlan === 'yearly'
                           ? 'border-primary bg-primary/5'
                           : 'border-border hover:border-primary/50'
@@ -422,7 +422,7 @@ export function AgentBuilderForm() {
                       <div className="flex flex-col">
                         <div className="font-semibold text-base">Tahunan</div>
                         <div className="text-xs text-slate-500 mt-1">Aktif 365 hari</div>
-                        <div className="mt-2 text-lg sm:text-xl font-extrabold text-primary truncate">
+                        <div className="mt-2 text-base sm:text-lg font-bold text-primary">
                           {formatRupiah(YEARLY_PLAN.priceMonthly)}
                         </div>
                       </div>
@@ -662,12 +662,12 @@ export function AgentBuilderForm() {
             {/* ── Plan sidebar ── */}
             <div className="border-t bg-muted/30 p-6 md:border-l md:border-t-0 md:p-6">
               <div className="sticky top-24 space-y-4">
-                <div className="rounded-xl border bg-card p-4">
+                <div className="rounded-xl border bg-card p-4 sm:p-5">
                   <span className="inline-block rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
                     {selectedPlan === 'trial' ? TRIAL_PLAN.name : selectedPlan === 'yearly' ? YEARLY_PLAN.name : BASIC_PLAN.name}
                   </span>
                   <div className="mt-3 flex items-baseline gap-1">
-                    <span className="font-display text-3xl font-extrabold tracking-tight truncate">
+                    <span className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight">
                       {selectedPlan === 'trial' ? 'GRATIS' : selectedPlan === 'yearly' ? formatRupiah(YEARLY_PLAN.priceMonthly) : formatRupiah(BASIC_PLAN.priceMonthly)}
                     </span>
                     <span className="text-sm text-muted-foreground">
