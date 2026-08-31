@@ -45,13 +45,16 @@ export async function POST(req: NextRequest) {
     ocrFormData.append('scale', 'true');
     ocrFormData.append('ocrengine', '2');
 
-    const res = await fetch(OCR_API_URL, {
-      method: 'POST',
-      headers: {
-        apikey: OCR_API_KEY,
-      },
-      body: ocrFormData,
-    });
+    const res = await withTimeout(
+      fetch(OCR_API_URL, {
+        method: 'POST',
+        headers: {
+          apikey: OCR_API_KEY,
+        },
+        body: ocrFormData,
+      }),
+      45000
+    );
 
     if (!res.ok) {
       const detail = await res.text();
@@ -62,7 +65,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const data = await res.json();
+    const raw = await res.text();
+    console.log('OCR API Raw Response:', raw);
+
+    let data: any;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return NextResponse.json(
+        { error: 'Gagal membaca respons OCR.space' },
+        { status: 500 }
+      );
+    }
+
+    if (data.IsErroredOnProcessing === true) {
+      const message = Array.isArray(data.ErrorMessage)
+        ? data.ErrorMessage[0]
+        : data.ErrorMessage || 'OCR processing error';
+      return NextResponse.json(
+        { error: message },
+        { status: 422 }
+      );
+    }
+
     if (data.ParsedResults && data.ParsedResults.length > 0) {
       const text = data.ParsedResults[0].ParsedText || '';
       if (text.trim().length > 0) {

@@ -36,27 +36,47 @@ async function extractTextFromPDF(data: Uint8Array): Promise<string> {
 
 async function ocrSpaceText(data: Uint8Array, mimeType: string): Promise<string> {
   try {
-    const apiKey = process.env.OCR_SPACE_API_KEY || 'helloworld';
-    console.log('[OCR] Calling OCR.space for mimeType:', mimeType, 'data length:', data.length);
-
-    const ocrFormData = new FormData();
-    const blob = new Blob([data], { type: mimeType });
-    ocrFormData.append('apikey', apiKey);
-    ocrFormData.append('file', blob, 'upload.' + mimeType.split('/')[1]);
-    ocrFormData.append('language', 'eng');
-
-    const res = await fetch('https://api.ocr.space/parse/image', {
-      method: 'POST',
-      body: ocrFormData,
-    });
-
-    if (!res.ok) {
-      console.error('[OCR] OCR.space request failed with status:', res.status);
+    const apiKey = process.env.OCR_SPACE_API_KEY;
+    if (!apiKey) {
+      console.warn('[OCR] OCR_SPACE_API_KEY tidak ditemukan, lewati OCR');
       return '';
     }
 
-    const json = await res.json();
-    console.log('[OCR] OCR.space response:', JSON.stringify(json).substring(0, 200));
+    console.log('[OCR] Calling OCR.space for mimeType:', mimeType, 'data length:', data.length);
+
+    const blob = new Blob([data], { type: mimeType });
+    const formData = new FormData();
+    formData.append('file', blob, 'upload.' + mimeType.split('/')[1]);
+    formData.append('language', 'ind');
+    formData.append('isOverlayRequired', 'false');
+    formData.append('detectOrientation', 'true');
+    formData.append('scale', 'true');
+    formData.append('ocrengine', '2');
+
+    const res = await fetch('https://api.ocr.space/parse/image', {
+      method: 'POST',
+      headers: {
+        apikey: apiKey,
+      },
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const detail = await res.text();
+      console.error('[OCR] OCR.space request failed with status:', res.status, 'detail:', detail);
+      return '';
+    }
+
+    const raw = await res.text();
+    console.log('[OCR] OCR.space raw response:', raw.substring(0, 500));
+
+    let json: any;
+    try {
+      json = JSON.parse(raw);
+    } catch {
+      console.error('[OCR] Gagal parse JSON respons OCR.space');
+      return '';
+    }
 
     if (json.IsErroredOnProcessing) {
       console.error('[OCR] OCR.space reported error:', json.ErrorMessage);

@@ -48,7 +48,6 @@ export function AgentBuilderForm() {
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<'trial' | 'monthly' | 'yearly'>('monthly');
   const [selectedPdfFile, setSelectedPdfFile] = useState<File | null>(null);
-  const [pdfExtractError, setPdfExtractError] = useState<string | null>(null);
 
   useEffect(() => {
     const ref = searchParams.get('ref');
@@ -83,8 +82,8 @@ export function AgentBuilderForm() {
     if (extension === 'txt') {
       try {
         return await file.text();
-      } catch (err) {
-        throw new Error('Gagal membaca file TXT');
+      } catch {
+        return '';
       }
     } else if (extension === 'pdf') {
       try {
@@ -102,26 +101,13 @@ export function AgentBuilderForm() {
         clearTimeout(timeoutId);
         
         if (!res.ok) {
-          const errorText = await res.text();
-          console.error('PDF extraction API error:', errorText);
-          try {
-            const errorData = JSON.parse(errorText);
-            throw new Error(errorData.error || 'Gagal mengekstrak teks PDF');
-          } catch {
-            throw new Error('Gagal mengekstrak teks PDF');
-          }
+          return '';
         }
         
         const data = await res.json();
-        return data.text;
-      } catch (err) {
-        if (err instanceof Error) {
-          if (err.name === 'AbortError') {
-            throw new Error('Gagal membaca file PDF: timeout');
-          }
-          throw err;
-        }
-        throw new Error('Gagal membaca file PDF');
+        return data.text || '';
+      } catch {
+        return '';
       }
     } else if (isImage) {
       try {
@@ -139,30 +125,17 @@ export function AgentBuilderForm() {
         clearTimeout(timeoutId);
         
         if (!res.ok) {
-          const errorText = await res.text();
-          console.error('Image OCR API error:', errorText);
-          try {
-            const errorData = JSON.parse(errorText);
-            throw new Error(errorData.error || 'Gagal membaca teks dari gambar');
-          } catch {
-            throw new Error('Gagal membaca teks dari gambar');
-          }
+          return '';
         }
         
         const data = await res.json();
-        return data.text;
-      } catch (err) {
-        if (err instanceof Error) {
-          if (err.name === 'AbortError') {
-            throw new Error('Gagal membaca gambar: timeout');
-          }
-          throw err;
-        }
-        throw new Error('Gagal membaca gambar');
+        return data.text || '';
+      } catch {
+        return '';
       }
-    } else {
-      throw new Error('Unsupported file type. Please upload PDF, TXT, or image files.');
     }
+    
+    return '';
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -179,33 +152,29 @@ export function AgentBuilderForm() {
       setError('Some files were skipped. Only PDF, TXT, and image files are supported.');
     }
 
-    const pdfFile = validFiles.find(file => {
+    const docFile = validFiles.find(file => {
       const extension = file.name.split('.').pop()?.toLowerCase();
       return extension === 'pdf' || file.type.startsWith('image/');
     });
-    if (pdfFile) {
-      setSelectedPdfFile(pdfFile);
-    }
-
-    const oversizedPdf = validFiles.find(file => {
-      const extension = file.name.split('.').pop()?.toLowerCase();
-      return extension === 'pdf' && file.size > 1048576;
-    });
-    if (oversizedPdf) {
-      setError('File PDF scan di atas 1 MB. Disarankan upload screenshot gambar (JPG/PNG) atau tempel teksnya langsung.');
+    if (docFile) {
+      setSelectedPdfFile(docFile);
     }
 
     setUploadedFiles(prev => [...prev, ...validFiles]);
-    setPdfExtractError(null);
 
     setIsExtracting(true);
     try {
-      const texts = await Promise.all(validFiles.map(extractTextFromFile));
-      setExtractedText(prev => prev + '\n\n' + texts.join('\n\n'));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to extract text from files';
-      setPdfExtractError('Gagal membaca file, silakan masukkan teks manual');
-      console.error('[FILE EXTRACT]', message);
+      const results = await Promise.allSettled(validFiles.map(extractTextFromFile));
+      const texts = results
+        .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled')
+        .map(r => r.value)
+        .filter(Boolean);
+      
+      if (texts.length > 0) {
+        setExtractedText(prev => prev + '\n\n' + texts.join('\n\n'));
+      }
+    } catch {
+      // extraction is optional, continue without extracted text
     } finally {
       setIsExtracting(false);
     }
@@ -232,14 +201,20 @@ export function AgentBuilderForm() {
     
     if (remainingFiles.length > 0) {
       setIsExtracting(true);
-      setPdfExtractError(null);
       try {
-        const texts = await Promise.all(remainingFiles.map(extractTextFromFile));
-        setExtractedText(texts.join('\n\n'));
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to re-extract text';
-        setPdfExtractError('Gagal membaca file, silakan masukkan teks manual');
-        console.error('[FILE RE-EXTRACT]', message);
+        const results = await Promise.allSettled(remainingFiles.map(extractTextFromFile));
+        const texts = results
+          .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled')
+          .map(r => r.value)
+          .filter(Boolean);
+        
+        if (texts.length > 0) {
+          setExtractedText(texts.join('\n\n'));
+        } else {
+          setExtractedText('');
+        }
+      } catch {
+        // extraction is optional, continue without extracted text
       } finally {
         setIsExtracting(false);
       }
@@ -572,11 +547,6 @@ export function AgentBuilderForm() {
                     <p className="text-xs text-primary flex items-center gap-1">
                       <Loader2 className="h-3 w-3 animate-spin" />
                       Mengekstrak teks dari file...
-                    </p>
-                  )}
-                  {pdfExtractError && (
-                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
-                      {pdfExtractError}
                     </p>
                   )}
                   {uploadedFiles.length > 0 && (
