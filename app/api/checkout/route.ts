@@ -478,89 +478,29 @@ export async function POST(req: NextRequest) {
 
       agentId = trialAgent.id;
 
-      if (isMockMode) {
-        console.log('[CHECKOUT] API Key kosong. Masuk ke mock mode.');
+      const { error: transactionError } = await supabaseAdmin
+        .from('transactions')
+        .insert({
+          agent_id: agentId,
+          amount: 0,
+          payment_method: 'free_trial',
+          payment_status: 'PAID',
+          status: 'PAID',
+          merchant_ref: trialMerchantRef,
+          reference: 'TRIAL-' + Date.now(),
+          package_id: planPackageId,
+          customer_name: name,
+          customer_email: email,
+          customer_phone: phone,
+        });
 
-        const { error: transactionError } = await supabaseAdmin
-          .from('transactions')
-          .insert({
-            agent_id: agentId,
-            amount: 0,
-            payment_method: 'mock_ipaymu',
-            payment_status: 'PAID',
-            status: 'PAID',
-            merchant_ref: trialMerchantRef,
-            reference: 'MOCK-' + Date.now(),
-            package_id: planPackageId,
-            customer_name: name,
-            customer_email: email,
-            customer_phone: phone,
-          });
-
-        if (transactionError) {
-          console.error('[CHECKOUT] Mock trial transaction creation error:', transactionError);
-        }
-
-        transactionId = trialMerchantRef;
-        redirectUrl = '/success?ref=MOCK&slug=' + slug;
-        paymentIsSandbox = true;
-      } else {
-        console.log('[CHECKOUT] API Key terdeteksi. Memanggil iPaymu...');
-        const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_BASE_URL || 'https://example.com';
-        const returnUrl = `${origin}/success?ref=ipaymu&slug=${slug}`;
-        const notifyUrl = `${origin}/api/webhooks/ipaymu`;
-        const cancelUrl = `${origin}/`;
-
-        let paymentUrl = '';
-        let paymentSandbox = true;
-
-        try {
-          const ipaymu = await createIpaymuPayment({
-            referenceId: trialMerchantRef,
-            productName: agentName + ' (Free Trial 3 Hari)',
-            price: 0,
-            buyerName: name,
-            buyerEmail: email,
-            buyerPhone: phone,
-            returnUrl,
-            notifyUrl,
-            cancelUrl,
-          });
-          paymentUrl = ipaymu.url;
-          paymentSandbox = ipaymu.sandbox;
-        } catch (payErr) {
-          console.error('[CHECKOUT] iPaymu trial payment creation failed:', payErr);
-          const message = payErr instanceof Error ? payErr.message : String(payErr);
-          return NextResponse.json(
-            { error: message },
-            { status: 500 }
-          );
-        }
-
-        const { error: transactionError } = await supabaseAdmin
-          .from('transactions')
-          .insert({
-            agent_id: agentId,
-            amount: 0,
-            payment_method: 'ipaymu',
-            payment_status: 'PENDING',
-            status: 'UNPAID',
-            merchant_ref: trialMerchantRef,
-            reference: '',
-            package_id: planPackageId,
-            customer_name: name,
-            customer_email: email,
-            customer_phone: phone,
-          });
-
-        if (transactionError) {
-          console.error('[CHECKOUT] Trial transaction creation error:', transactionError);
-        }
-
-        transactionId = trialMerchantRef;
-        redirectUrl = paymentUrl;
-        paymentIsSandbox = paymentSandbox;
+      if (transactionError) {
+        console.error('[CHECKOUT] Trial transaction creation error:', transactionError);
       }
+
+      transactionId = trialMerchantRef;
+      redirectUrl = '/success?ref=trial&slug=' + slug;
+      paymentIsSandbox = true;
     } else if (!isRenewal) {
       const merchantRef = 'REF-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
 
