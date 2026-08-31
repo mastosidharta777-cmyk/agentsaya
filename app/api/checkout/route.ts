@@ -132,7 +132,8 @@ export async function POST(req: NextRequest) {
       renewal = formData.get('renewal') === 'true';
       
       const pdfFile = formData.get('pdfFile') as File | null;
-      if (pdfFile) {
+      
+      if (planType !== 'trial' && pdfFile) {
         console.log('[CHECKOUT PDF] Apakah pdfFile ada?', !!pdfFile);
         console.log('[CHECKOUT PDF] Nama File:', pdfFile.name, 'Ukuran:', pdfFile.size, 'Tipe:', pdfFile.type);
 

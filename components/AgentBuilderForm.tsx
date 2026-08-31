@@ -299,11 +299,12 @@ export function AgentBuilderForm() {
           console.error('Checkout API error:', errorText);
           try {
             const errorData = JSON.parse(errorText);
-            console.error('Parsed error data:', errorData);
-            throw new Error(errorData.error || 'Gagal membuat trial');
+            const apiError = errorData.error || 'Gagal membuat trial';
+            setError('Error: ' + apiError + ' | Cek console browser (F12) untuk detail lengkap.');
           } catch {
-            throw new Error('Gagal membuat trial');
+            setError('Gagal membuat trial. Cek console browser (F12) untuk detail.');
           }
+          return;
         }
         
         const data = await res.json();
