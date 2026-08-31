@@ -47,7 +47,7 @@ async function ocrSpaceText(data: Uint8Array, mimeType: string): Promise<string>
     const blob = new Blob([data], { type: mimeType });
     const formData = new FormData();
     formData.append('file', blob, 'upload.' + mimeType.split('/')[1]);
-    formData.append('language', 'ind');
+    formData.append('language', 'eng');
     formData.append('isOverlayRequired', 'false');
     formData.append('detectOrientation', 'true');
     formData.append('scale', 'true');

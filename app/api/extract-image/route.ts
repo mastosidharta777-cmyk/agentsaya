@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
     const ocrFormData = new FormData();
     ocrFormData.append('file', file);
-    ocrFormData.append('language', 'ind');
+    ocrFormData.append('language', 'eng');
     ocrFormData.append('isOverlayRequired', 'false');
     ocrFormData.append('detectOrientation', 'true');
     ocrFormData.append('scale', 'true');

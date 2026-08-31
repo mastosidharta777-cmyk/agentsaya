@@ -20,7 +20,7 @@ async function tryOcrSpace(file: File): Promise<string> {
 
   const formData = new FormData();
   formData.append('file', file, 'file.pdf');
-  formData.append('language', 'ind');
+  formData.append('language', 'eng');
   formData.append('isOverlayRequired', 'false');
   formData.append('detectOrientation', 'true');
   formData.append('scale', 'true');
