@@ -44,6 +44,8 @@ CREATE INDEX IF NOT EXISTS idx_agents_trial_ends_at ON agents(trial_ends_at);
 CREATE INDEX IF NOT EXISTS idx_agents_referral_code ON agents(referral_code);
 CREATE INDEX IF NOT EXISTS idx_agents_referred_by ON agents(referred_by);
 
+ALTER TABLE agents DROP CONSTRAINT IF EXISTS agents_transaction_id_fkey;
+ALTER TABLE agents DROP CONSTRAINT IF EXISTS agents_referred_by_fkey;
 ALTER TABLE agents ADD CONSTRAINT agents_transaction_id_fkey FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL;
 ALTER TABLE agents ADD CONSTRAINT agents_referred_by_fkey FOREIGN KEY (referred_by) REFERENCES agents(id) ON DELETE SET NULL;
 
