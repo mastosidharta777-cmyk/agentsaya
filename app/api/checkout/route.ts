@@ -470,8 +470,9 @@ export async function POST(req: NextRequest) {
 
       if (trialError || !trialAgent) {
         console.error('[CHECKOUT] Trial agent creation error:', trialError);
+        const detail = trialError?.message || JSON.stringify(trialError) || 'Unknown error';
         return NextResponse.json(
-          { error: 'Gagal membuat agent trial. Silakan coba lagi.' },
+          { error: 'Gagal membuat agent trial: ' + detail },
           { status: 500 }
         );
       }
@@ -534,8 +535,9 @@ export async function POST(req: NextRequest) {
 
       if (paidError || !paidAgent) {
         console.error('[CHECKOUT] Paid agent creation error:', paidError);
+        const detail = paidError?.message || JSON.stringify(paidError) || 'Unknown error';
         return NextResponse.json(
-          { error: 'Gagal membuat agent. Silakan coba lagi.' },
+          { error: 'Gagal membuat agent: ' + detail },
           { status: 500 }
         );
       }

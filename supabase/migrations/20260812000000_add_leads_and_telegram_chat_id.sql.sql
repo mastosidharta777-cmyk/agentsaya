@@ -1,5 +1,5 @@
 /*
-# AgentKu — Add leads table and telegram_chat_id to agents
+# Agent Saya — Add leads table and telegram_chat_id to agents
 
 ## Overview
 Adds lead capture functionality for chat interactions and per-agent Telegram notifications.

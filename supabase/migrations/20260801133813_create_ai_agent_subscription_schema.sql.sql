@@ -1,5 +1,5 @@
 /*
-# AgentKu — AI Agent subscription & payment schema
+# Agent Saya — AI Agent subscription & payment schema
 
 ## Overview
 Single-tenant MVP for selling AI sales-agent subscriptions to real-estate

@@ -1,4 +1,4 @@
-# AgentKu
+# Agent Saya
 
 Platform SaaS RAG Agent untuk Customer Support & Sales Assistant berbasis dokumen (PDF/Gambar Price List).
 

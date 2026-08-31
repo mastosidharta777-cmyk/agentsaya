@@ -1,5 +1,5 @@
 /*
-# AgentKu — refactor from package seller to AI Agent Builder Platform
+# Agent Saya — refactor from package seller to AI Agent Builder Platform
 
 ## Overview
 Transforms the schema from a fixed package catalog into a self-service AI
