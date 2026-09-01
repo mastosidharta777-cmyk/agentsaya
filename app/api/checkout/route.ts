@@ -407,6 +407,70 @@ export async function POST(req: NextRequest) {
 
     const isRenewal = renewal && slug;
 
+    if (!isRenewal && planType !== 'trial' && email) {
+      const { data: existingPaidAgent, error: existingError } = await supabaseAdmin
+        .from('agents')
+        .select('id, agent_name, custom_agent_slug, payment_status, period_end, trial_ends_at')
+        .or(`owner_email.eq.${email}${phone ? `,owner_phone.eq.${phone}` : ''}`)
+        .in('payment_status', ['PAID', 'TRIAL'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingError) {
+        console.error('[CHECKOUT] Duplicate check error:', existingError);
+      }
+
+      if (existingPaidAgent) {
+        const isActive = existingPaidAgent.payment_status === 'PAID'
+          ? existingPaidAgent.period_end && new Date(existingPaidAgent.period_end) > new Date()
+          : existingPaidAgent.trial_ends_at && new Date(existingPaidAgent.trial_ends_at) > new Date();
+
+        if (isActive) {
+          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.agentsaya.site';
+          return NextResponse.json(
+            {
+              error: `Anda sudah memiliki agent aktif (${existingPaidAgent.agent_name}). Setiap akun hanya untuk 1 agent. Silakan perpanjang atau edit knowledge base agent yang sudah ada di dashboard.`,
+              existingAgentSlug: existingPaidAgent.custom_agent_slug,
+              dashboardUrl: `${baseUrl}/dashboard`,
+              upgradeUrl: `${baseUrl}/checkout?slug=${existingPaidAgent.custom_agent_slug}&renewal=true`,
+            },
+            { status: 409 }
+          );
+        }
+      }
+    }
+
+    if (planType === 'trial' && !isRenewal) {
+      const { data: previousTrial, error: previousError } = await supabaseAdmin
+        .from('agents')
+        .select('id, agent_name, custom_agent_slug, payment_status, trial_ends_at')
+        .or(`owner_email.eq.${email}${phone ? `,owner_phone.eq.${phone}` : ''}`)
+        .eq('payment_status', 'TRIAL')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (previousError) {
+        console.error('[CHECKOUT] Previous trial check error:', previousError);
+      }
+
+      if (previousTrial) {
+        const trialStillActive = previousTrial.trial_ends_at && new Date(previousTrial.trial_ends_at) > new Date();
+        if (trialStillActive) {
+          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.agentsaya.site';
+          return NextResponse.json(
+            {
+              error: `Anda sudah punya trial aktif (${previousTrial.agent_name}). Silakan gunakan dashboard untuk mengelola agent Anda, atau langsung upgrade ke paket berbayar.`,
+              dashboardUrl: `${baseUrl}/dashboard`,
+              upgradeUrl: `${baseUrl}/checkout?slug=${previousTrial.custom_agent_slug}&renewal=true`,
+            },
+            { status: 409 }
+          );
+        }
+      }
+    }
+
     if (isRenewal) {
       const { data: existingAgent, error: existingError } = await supabaseAdmin
         .from('agents')
