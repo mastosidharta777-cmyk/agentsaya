@@ -112,7 +112,7 @@ Anda adalah ${agentName}, seorang Senior Consultative Sales & Marketing Speciali
     - Jika Knowledge Base berisi data tabel/harga yang rumit, rangkum dan sajikan angka-angka penting tersebut secara rapi, bertahap, dan mudah dipahami.
 
  8A. **FORMAT TABEL HARGA DI CHAT (MOBILE-FRIENDLY):**
-     - WAJIB sajikan daftar harga dalam **Markdown Table** dengan sintaks pipe `|`. Contoh struktur:
+     - WAJIB sajikan daftar harga dalam **Markdown Table** dengan sintaks pipe \`|\`. Contoh struktur:
        \`\`\`
        | Tipe | Unit Tersedia | Tunai Keras | Bertahap 12x | Bertahap 24x | DP 10% (10x) |
        |------|---------------|-------------|--------------|--------------|--------------|

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bot, Copy, Check, Calendar, Gift, LogOut, Edit, Save, X, Users } from 'lucide-react';
+import { Bot, Copy, Check, Calendar, Gift, LogOut, Edit, Save, X, Users, AlertTriangle, Clock, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,8 +13,9 @@ interface Agent {
   id: string;
   agent_name: string;
   custom_agent_slug: string;
-  payment_status: 'PENDING' | 'PAID';
+  payment_status: 'PENDING' | 'PAID' | 'TRIAL' | 'EXPIRED';
   period_end: string | null;
+  trial_ends_at: string | null;
   knowledge_base: string;
   referral_code: string;
   referral_bonus_days: number;
@@ -163,6 +164,25 @@ export default function DashboardPage() {
     return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   };
 
+  const getHoursRemaining = (trialEndsAt: string | null) => {
+    if (!trialEndsAt) return 0;
+    const end = new Date(trialEndsAt);
+    const now = new Date();
+    return Math.max(0, Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60)));
+  };
+
+  const getTrialCountdown = (trialEndsAt: string | null) => {
+    if (!trialEndsAt) return null;
+    const end = new Date(trialEndsAt);
+    const now = new Date();
+    const diffMs = end.getTime() - now.getTime();
+    if (diffMs <= 0) return { expired: true, days: 0, hours: 0 };
+    const totalHours = Math.ceil(diffMs / (1000 * 60 * 60));
+    const days = Math.floor(totalHours / 24);
+    const hours = totalHours % 24;
+    return { expired: false, days, hours, totalHours };
+  };
+
   const getReferralStats = () => {
     // Calculate total referrals and bonus days from agent data
     const totalReferred = agents.reduce((sum, agent) => sum + (agent.total_referred || 0), 0);
@@ -235,6 +255,83 @@ export default function DashboardPage() {
             Keluar
           </Button>
         </div>
+
+        {/* Trial Countdown Banners */}
+        {agents.filter((a) => a.payment_status === 'TRIAL' && a.period_end).length > 0 && (
+          <div className="mb-6 space-y-3">
+            {agents.filter((a) => a.payment_status === 'TRIAL' && a.period_end).map((agent) => {
+              const countdown = getTrialCountdown(agent.period_end);
+              if (!countdown) return null;
+
+              if (countdown.expired) {
+                return (
+                  <Card key={`trial-expired-${agent.id}`} className="border-red-300 bg-red-50">
+                    <CardContent className="flex items-center justify-between p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-full bg-red-100 p-2">
+                          <AlertTriangle className="h-5 w-5 text-red-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-red-900">Trial Berakhir</h3>
+                          <p className="text-sm text-red-700">
+                            Agent <strong>{agent.agent_name}</strong> sudah tidak aktif. Upgrade sekarang untuk mengaktifkan kembali.
+                          </p>
+                        </div>
+                      </div>
+                      <Button asChild size="sm" className="bg-red-600 hover:bg-red-700">
+                        <a href="/#pricing">Upgrade Sekarang</a>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              }
+
+              if (countdown.totalHours! <= 48) {
+                return (
+                  <Card key={`trial-warning-${agent.id}`} className="border-amber-300 bg-amber-50">
+                    <CardContent className="flex items-center justify-between p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-full bg-amber-100 p-2">
+                          <Clock className="h-5 w-5 text-amber-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-amber-900">⚠️ Trial Berakhir dalam {countdown.totalHours} jam</h3>
+                          <p className="text-sm text-amber-700">
+                            Agent <strong>{agent.agent_name}</strong> akan nonaktif. Upgrade sekarang dengan harga spesial.
+                          </p>
+                        </div>
+                      </div>
+                      <Button asChild size="sm" className="bg-amber-600 hover:bg-amber-700">
+                        <a href="/#pricing">Upgrade Sekarang</a>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              }
+
+              return (
+                <Card key={`trial-info-${agent.id}`} className="border-primary/30 bg-primary/5">
+                  <CardContent className="flex items-center justify-between p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-full bg-primary/10 p-2">
+                        <Sparkles className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">🎁 Free Trial Aktif</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Agent <strong>{agent.agent_name}</strong> tersisa <strong>{countdown.days} hari {countdown.hours} jam</strong>
+                        </p>
+                      </div>
+                    </div>
+                    <Button asChild size="sm" variant="outline">
+                      <a href="/#pricing">Lihat Paket</a>
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
 
         <div className="grid gap-6 lg:grid-cols-2">
           {/* My AI Agents Section */}
