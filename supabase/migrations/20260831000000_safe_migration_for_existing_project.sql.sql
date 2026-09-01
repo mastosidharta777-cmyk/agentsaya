@@ -65,7 +65,7 @@ CREATE POLICY "anon_update_transactions" ON transactions FOR UPDATE TO anon, aut
 
 -- Agents
 DROP POLICY IF EXISTS "anon_select_paid_agents" ON agents;
-CREATE POLICY "anon_select_paid_agents" ON agents FOR SELECT TO anon, authenticated USING (payment_status = 'PAID' OR payment_status = 'TRIAL');
+CREATE POLICY "anon_select_paid_agents" ON agents FOR SELECT TO anon, authenticated USING (payment_status = 'PAID' OR payment_status = 'TRIAL' OR payment_status = 'EXPIRED');
 
 DROP POLICY IF EXISTS "anon_insert_agents" ON agents;
 CREATE POLICY "anon_insert_agents" ON agents FOR INSERT TO anon, authenticated WITH CHECK (true);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase';
 
 /**
  * POST /api/dashboard/auth
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     const isPhone = !isEmail;
 
     // Query agents by email or phone
-    const { data: agents, error } = await supabase
+    const { data: agents, error } = await supabaseAdmin
       .from('agents')
       .select('*')
       .or(isEmail ? `owner_email.eq.${contact}` : `owner_phone.eq.${contact}`);
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
 
     // Calculate referral stats for each agent
     const agentIds = agents.map(a => a.id);
-    const { data: referrals, error: refError } = await supabase
+    const { data: referrals, error: refError } = await supabaseAdmin
       .from('agents')
       .select('referred_by')
       .in('referred_by', agentIds)
