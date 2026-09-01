@@ -5,6 +5,123 @@ import { Bot, Send, Loader2, ArrowDown, AlertCircle, ArrowUp } from 'lucide-reac
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 
+function renderMarkdown(text: string) {
+  const lines = text.split('\n');
+  const blocks: JSX.Element[] = [];
+  let tableRows: string[][] = [];
+  let inTable = false;
+  let keyCounter = 0;
+
+  const flushTable = () => {
+    if (tableRows.length > 0) {
+      const header = tableRows[0];
+      const body = tableRows.slice(2);
+      blocks.push(
+        <div key={`table-${keyCounter++}`} className="my-3 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          <table className="w-full text-xs">
+            <thead className="bg-slate-100">
+              <tr>
+                {header.map((cell, i) => (
+                  <th key={i} className="px-3 py-2 text-left font-semibold text-slate-700">
+                    {cell.trim()}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {body.map((row, ri) => (
+                <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                  {row.map((cell, ci) => (
+                    <td key={ci} className="px-3 py-2 text-slate-700">
+                      {cell.trim()}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      tableRows = [];
+      inTable = false;
+    }
+  };
+
+  lines.forEach((rawLine, idx) => {
+    const line = rawLine;
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      const cells = trimmed.slice(1, -1).split('|');
+      tableRows.push(cells);
+      inTable = true;
+      return;
+    } else if (inTable && (trimmed === '' || !trimmed.startsWith('|'))) {
+      flushTable();
+    }
+
+    if (trimmed === '') {
+      blocks.push(<div key={`br-${idx}`} className="h-1" />);
+      return;
+    }
+
+    if (trimmed.startsWith('### ')) {
+      blocks.push(<h3 key={idx} className="mt-3 mb-1 text-sm font-bold text-slate-900">{trimmed.slice(4)}</h3>);
+      return;
+    }
+    if (trimmed.startsWith('## ')) {
+      blocks.push(<h2 key={idx} className="mt-3 mb-1 text-base font-bold text-slate-900">{trimmed.slice(3)}</h2>);
+      return;
+    }
+    if (trimmed.startsWith('# ')) {
+      blocks.push(<h1 key={idx} className="mt-3 mb-1 text-lg font-bold text-slate-900">{trimmed.slice(2)}</h1>);
+      return;
+    }
+
+    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      blocks.push(
+        <div key={idx} className="my-0.5 flex gap-2 text-slate-700">
+          <span className="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400" />
+          <span dangerouslySetInnerHTML={{ __html: inlineFormat(trimmed.slice(2)) }} />
+        </div>
+      );
+      return;
+    }
+
+    if (/^\d+\.\s/.test(trimmed)) {
+      const num = trimmed.match(/^(\d+)\.\s(.*)$/);
+      if (num) {
+        blocks.push(
+          <div key={idx} className="my-0.5 flex gap-2 text-slate-700">
+            <span className="font-semibold text-slate-500">{num[1]}.</span>
+            <span dangerouslySetInnerHTML={{ __html: inlineFormat(num[2]) }} />
+          </div>
+        );
+        return;
+      }
+    }
+
+    blocks.push(
+      <p key={idx} className="my-1 text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: inlineFormat(trimmed) }} />
+    );
+  });
+
+  flushTable();
+
+  return <div className="text-sm">{blocks}</div>;
+}
+
+function inlineFormat(text: string): string {
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  return escaped
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>')
+    .replace(/(?<!\*)\*(?!\*)(.+?)\*(?!\*)/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code class="rounded bg-slate-100 px-1 py-0.5 text-xs font-mono">$1</code>');
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -200,13 +317,13 @@ export function ChatInterface({
                 </div>
               )}
               <div
-                className={`${isEmbed ? 'max-w-[90%]' : 'max-w-[80%]'} whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
+                className={`${isEmbed ? 'max-w-[90%]' : 'max-w-[85%]'} rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
                   msg.role === 'user'
-                    ? 'rounded-br-md bg-primary text-primary-foreground'
-                    : 'rounded-bl-md bg-card border'
+                    ? 'rounded-br-md bg-primary text-primary-foreground whitespace-pre-wrap'
+                    : 'rounded-bl-md bg-card border overflow-x-auto'
                 }`}
               >
-                {msg.content}
+                {msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content}
               </div>
             </div>
           ))}
