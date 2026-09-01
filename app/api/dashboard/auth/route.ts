@@ -42,30 +42,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Calculate referral stats for each agent
-    const agentIds = agents.map(a => a.id);
-    const { data: referrals, error: refError } = await supabaseAdmin
-      .from('agents')
-      .select('referred_by')
-      .in('referred_by', agentIds)
-      .eq('payment_status', 'PAID');
-
-    if (!refError && referrals) {
-      // Count referrals per agent
-      const referralCounts = agentIds.reduce((acc, id) => {
-        acc[id] = referrals.filter(r => r.referred_by === id).length;
-        return acc;
-      }, {} as Record<string, number>);
-
-      // Add referral counts to agents
-      agents.forEach(agent => {
-        (agent as any).total_referred = referralCounts[agent.id] || 0;
+    const sortedAgents = agents
+      .map((a) => ({
+        ...a,
+        total_referred: 0,
+      }))
+      .sort((a, b) => {
+        const aActive = a.payment_status === 'PAID' && (!a.period_end || new Date(a.period_end) > new Date());
+        const bActive = b.payment_status === 'PAID' && (!b.period_end || new Date(b.period_end) > new Date());
+        if (aActive && !bActive) return -1;
+        if (!aActive && bActive) return 1;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
-    }
 
     return NextResponse.json({
       success: true,
-      agents,
+      agents: sortedAgents,
       contact,
     });
   } catch (err: unknown) {
