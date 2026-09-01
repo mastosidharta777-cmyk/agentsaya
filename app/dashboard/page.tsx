@@ -279,7 +279,7 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <Button asChild size="sm" className="bg-red-600 hover:bg-red-700">
-                        <a href="/#pricing">Upgrade Sekarang</a>
+                        <a href={`/checkout?slug=${agent.custom_agent_slug}&renewal=true`}>Upgrade Sekarang</a>
                       </Button>
                     </CardContent>
                   </Card>
@@ -302,7 +302,7 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <Button asChild size="sm" className="bg-amber-600 hover:bg-amber-700">
-                        <a href="/#pricing">Upgrade Sekarang</a>
+                        <a href={`/checkout?slug=${agent.custom_agent_slug}&renewal=true`}>Upgrade Sekarang</a>
                       </Button>
                     </CardContent>
                   </Card>
@@ -324,7 +324,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <Button asChild size="sm" variant="outline">
-                      <a href="/#pricing">Lihat Paket</a>
+                      <a href={`/checkout?slug=${agent.custom_agent_slug}&renewal=true`}>Lihat Paket</a>
                     </Button>
                   </CardContent>
                 </Card>

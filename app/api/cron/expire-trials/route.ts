@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
       if (!shouldSendToday(stage, agent.last_trial_reminder_sent || null, now)) continue;
       if (agent.last_trial_reminder_stage === stage) continue;
 
-      const upgradeUrl = `${baseUrl}/dashboard?renewal=${agent.custom_agent_slug}`;
+      const upgradeUrl = `${baseUrl}/checkout?slug=${agent.custom_agent_slug}&renewal=true`;
       const chatUrl = `${baseUrl}/chat/${agent.custom_agent_slug}`;
 
       try {
