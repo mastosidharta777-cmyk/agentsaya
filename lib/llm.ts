@@ -14,11 +14,13 @@ import OpenAI from 'openai';
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const SAMBANOVA_API_KEY = process.env.SAMBANOVA_API_KEY || '';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
 // Check API keys at startup
 console.log('[LLM INIT] GROQ_API_KEY:', GROQ_API_KEY ? '✓ Set' : '✗ Not set');
 console.log('[LLM INIT] OPENROUTER_API_KEY:', OPENROUTER_API_KEY ? '✓ Set' : '✗ Not set');
 console.log('[LLM INIT] SAMBANOVA_API_KEY:', SAMBANOVA_API_KEY ? '✓ Set' : '✗ Not set');
+console.log('[LLM INIT] OPENAI_API_KEY:', OPENAI_API_KEY ? '✓ Set' : '✗ Not set');
 
 if (!OPENROUTER_API_KEY) {
   console.warn('[LLM INIT] ⚠️  WARNING: OPENROUTER_API_KEY not found in environment. Fallback to OpenRouter will not work.');
@@ -26,10 +28,14 @@ if (!OPENROUTER_API_KEY) {
 if (!SAMBANOVA_API_KEY) {
   console.warn('[LLM INIT] ⚠️  WARNING: SAMBANOVA_API_KEY not found in environment. Fallback to SambaNova will not work.');
 }
+if (!OPENAI_API_KEY) {
+  console.warn('[LLM INIT] ⚠️  WARNING: OPENAI_API_KEY not found in environment. Fallback to OpenAI will not work.');
+}
 
-const SANDBOX = !GROQ_API_KEY && !OPENROUTER_API_KEY && !SAMBANOVA_API_KEY;
+const SANDBOX = !GROQ_API_KEY && !OPENROUTER_API_KEY && !SAMBANOVA_API_KEY && !OPENAI_API_KEY;
 
 const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const OPENROUTER_MODELS = [
   'openrouter/free',
 ];
@@ -62,6 +68,10 @@ const openrouter = OPENROUTER_API_KEY ? new OpenAI({
 const sambanova = SAMBANOVA_API_KEY ? new OpenAI({
   apiKey: SAMBANOVA_API_KEY,
   baseURL: 'https://api.sambanova.ai/v1',
+}) : null;
+const openai = OPENAI_API_KEY ? new OpenAI({
+  apiKey: OPENAI_API_KEY,
+  baseURL: 'https://api.openai.com/v1',
 }) : null;
 
 export interface ChatTurn {
@@ -121,7 +131,7 @@ async function tryGroq(messages: any[]): Promise<string> {
       const completion = await groq.chat.completions.create({
         model: model,
         messages: groqMessages,
-        max_tokens: 2000,
+        max_tokens: 4000,
         temperature: 0.0,
       });
 
@@ -161,7 +171,7 @@ async function tryOpenRouter(messages: any[]): Promise<string> {
       const completion = await openrouter.chat.completions.create({
         model: model,
         messages: messages,
-        max_tokens: 2000,
+        max_tokens: 4000,
         temperature: 0.0,
       });
 
@@ -200,7 +210,7 @@ async function trySambaNova(messages: any[]): Promise<string> {
       const completion = await sambanova.chat.completions.create({
         model: model,
         messages: messages,
-        max_tokens: 2000,
+        max_tokens: 4000,
         temperature: 0.0,
       });
 
@@ -219,8 +229,40 @@ async function trySambaNova(messages: any[]): Promise<string> {
     }
   }
 
-  console.log('[LLM FALLBACK] Semua model SambaNova gagal. Semua provider gagal.');
+  console.log('[LLM FALLBACK] Semua model SambaNova gagal. Mengalihkan ke OpenAI...');
   throw lastError || new Error('All SambaNova models failed');
+}
+
+async function tryOpenAI(messages: any[]): Promise<string> {
+  if (!openai) {
+    console.log('[OpenAI] Not configured, skipping');
+    throw new Error('OpenAI not configured');
+  }
+
+  try {
+    console.log(`[OpenAI] Attempting model: ${OPENAI_MODEL}`);
+    const completion = await openai.chat.completions.create({
+      model: OPENAI_MODEL,
+      messages: messages,
+      max_tokens: 4000,
+      temperature: 0.0,
+    });
+
+    const reply = completion.choices?.[0]?.message?.content?.trim() ||
+      'Maaf, saya tidak bisa menjawab saat ini. Silakan coba lagi.';
+
+    console.log(`[OpenAI] Success, reply length:`, reply.length);
+    return reply;
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error('LLM error');
+    console.error(`[OpenAI] Model ${OPENAI_MODEL} failed:`, error.message);
+    if (error.message.includes('401') || error.message.includes('authentication') || error.message.includes('API key')) {
+      console.error('[OpenAI] Authentication error - check API key');
+    } else if (error.message.includes('429') || error.message.includes('rate limit') || error.message.includes('quota')) {
+      console.error('[OpenAI] Rate limit / quota exceeded');
+    }
+    throw error;
+  }
 }
 
 /**
@@ -259,6 +301,9 @@ ATURAN WAJIB:
   }
   if (sambanova) {
     providers.push({ name: 'SambaNova', fn: () => trySambaNova(messages) });
+  }
+  if (openai) {
+    providers.push({ name: 'OpenAI', fn: () => tryOpenAI(messages) });
   }
 
   if (providers.length === 0) {
@@ -321,6 +366,9 @@ export async function chatComplete(req: LlmRequest): Promise<LlmResult> {
   }
   if (sambanova) {
     providers.push({ name: 'SambaNova', fn: () => trySambaNova(messages) });
+  }
+  if (openai) {
+    providers.push({ name: 'OpenAI', fn: () => tryOpenAI(messages) });
   }
 
   if (providers.length === 0) {
