@@ -146,7 +146,10 @@ export async function POST(req: NextRequest) {
     console.log('Agent is valid, using direct data for chat');
     console.log('Agent name:', directAgent.agent_name);
     console.log('Knowledge base length:', directAgent.knowledge_base?.length || 0);
+    console.log('Knowledge base preview:', (directAgent.knowledge_base || '').substring(0, 500));
     console.log('System prompt length:', directAgent.system_prompt?.length || 0);
+    console.log('System prompt preview:', (directAgent.system_prompt || '').substring(0, 500));
+    console.log('User message:', message);
     
 
     let result;
@@ -166,6 +169,8 @@ export async function POST(req: NextRequest) {
     }
 
     console.log('Chat complete result:', result);
+    console.log('Chat reply:', result.reply);
+    console.log('Chat sandbox:', result.sandbox);
 
     try {
       await supabaseAdmin
