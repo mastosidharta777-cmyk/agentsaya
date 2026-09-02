@@ -149,30 +149,11 @@ export async function POST(req: NextRequest) {
     console.log('System prompt length:', directAgent.system_prompt?.length || 0);
     
 
-    // Retrieval threshold: check if knowledge base is relevant enough
-    const MATCH_THRESHOLD = 0.70;
-    const knowledgeBaseText = directAgent.knowledge_base || '';
-    let relevantContext = knowledgeBaseText;
-
-    if (knowledgeBaseText.trim().length > 0) {
-      const userWords = new Set(message.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3));
-      const kbWords = knowledgeBaseText.toLowerCase().split(/\s+/);
-      const matches = kbWords.filter((w: string) => userWords.has(w)).length;
-      const overlap = userWords.size > 0 ? matches / userWords.size : 0;
-      const isRelevant = overlap >= MATCH_THRESHOLD;
-
-      console.log('[RETRIEVAL] User words:', userWords.size, 'KB words:', kbWords.length, 'Matches:', matches, 'Overlap:', overlap.toFixed(2), 'Relevant:', isRelevant);
-
-      if (!isRelevant) {
-        relevantContext = '';
-        console.log('[RETRIEVAL] Context below threshold, treating as empty');
-      }
-    }
     let result;
     try {
       result = await chatComplete({
         systemPrompt: directAgent.system_prompt || 'You are a helpful AI assistant.',
-        knowledgeBase: relevantContext,
+        knowledgeBase: directAgent.knowledge_base || '',
         userMessage: message,
         history: Array.isArray(history) ? history : [],
       });
