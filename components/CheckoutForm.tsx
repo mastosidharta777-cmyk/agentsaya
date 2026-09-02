@@ -36,6 +36,8 @@ export function CheckoutForm({
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dashboardUrl, setDashboardUrl] = useState<string | null>(null);
+  const [upgradeUrl, setUpgradeUrl] = useState<string | null>(null);
 
   const handlePay = async () => {
     setError(null);
@@ -63,6 +65,10 @@ export function CheckoutForm({
         try {
           const data = JSON.parse(text);
           setError(data.error || 'Gagal membuat pembayaran');
+          if (res.status === 409) {
+            setDashboardUrl(data.dashboardUrl || null);
+            setUpgradeUrl(data.upgradeUrl || null);
+          }
         } catch {
           setError('Gagal membuat pembayaran');
         }
@@ -138,9 +144,21 @@ export function CheckoutForm({
         </div>
 
         {error && (
-          <p className="text-sm text-destructive bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-            {error}
-          </p>
+          <div className="space-y-3">
+            <p className="text-sm text-destructive bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {error}
+            </p>
+            {dashboardUrl && (
+              <Button asChild variant="outline" size="sm">
+                <a href={dashboardUrl}>Ke Dashboard</a>
+              </Button>
+            )}
+            {upgradeUrl && (
+              <Button asChild size="sm">
+                <a href={upgradeUrl}>Upgrade ke Paket Berbayar</a>
+              </Button>
+            )}
+          </div>
         )}
 
         <Button

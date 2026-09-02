@@ -48,6 +48,8 @@ export function AgentBuilderForm() {
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<'trial' | 'monthly' | 'yearly'>('monthly');
   const [selectedPdfFile, setSelectedPdfFile] = useState<File | null>(null);
+  const [conflictDashboardUrl, setConflictDashboardUrl] = useState<string | null>(null);
+  const [conflictUpgradeUrl, setConflictUpgradeUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const ref = searchParams.get('ref');
@@ -59,7 +61,6 @@ export function AgentBuilderForm() {
   // Reset form when dialog closes (successful payment)
   useEffect(() => {
     if (!dialogOpen && payload) {
-      // Reset form fields after successful payment
       setAgentName('');
       setKnowledgeBase('');
       setWelcomeMessage('');
@@ -72,6 +73,8 @@ export function AgentBuilderForm() {
       setSelectedPdfFile(null);
       setError(null);
       setSubmitAttempted(false);
+      setConflictDashboardUrl(null);
+      setConflictUpgradeUrl(null);
     }
   }, [dialogOpen, payload]);
 
@@ -299,10 +302,13 @@ export function AgentBuilderForm() {
           console.error('Checkout API error:', errorText);
           try {
             const errorData = JSON.parse(errorText);
-            const apiError = errorData.error || 'Gagal membuat trial';
-            setError('Error: ' + apiError + ' | Cek console browser (F12) untuk detail lengkap.');
+            setError(errorData.error || 'Gagal membuat trial. Silakan coba lagi.');
+            if (res.status === 409) {
+              setConflictDashboardUrl(errorData.dashboardUrl || null);
+              setConflictUpgradeUrl(errorData.upgradeUrl || null);
+            }
           } catch {
-            setError('Gagal membuat trial. Cek console browser (F12) untuk detail.');
+            setError('Gagal membuat trial. Silakan coba lagi.');
           }
           return;
         }
@@ -653,7 +659,23 @@ export function AgentBuilderForm() {
                 </div>
 
                 {error && submitAttempted && (
-                  <p className="text-sm font-medium text-destructive">{error}</p>
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium text-destructive">{error}</p>
+                    {conflictDashboardUrl && (
+                      <Button asChild variant="outline" size="sm">
+                        <a href={conflictDashboardUrl}>
+                          Ke Dashboard
+                        </a>
+                      </Button>
+                    )}
+                    {conflictUpgradeUrl && (
+                      <Button asChild size="sm">
+                        <a href={conflictUpgradeUrl}>
+                          Upgrade ke Paket Berbayar
+                        </a>
+                      </Button>
+                    )}
+                  </div>
                 )}
 
                 <Button

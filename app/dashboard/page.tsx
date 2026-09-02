@@ -257,9 +257,9 @@ export default function DashboardPage() {
         </div>
 
         {/* Trial Countdown Banners */}
-        {agents.filter((a) => a.payment_status === 'TRIAL' && a.period_end).length > 0 && (
+        {agents.filter((a) => a.payment_status === 'TRIAL' && a.trial_ends_at).length > 0 && (
           <div className="mb-6 space-y-3">
-            {agents.filter((a) => a.payment_status === 'TRIAL' && a.period_end).map((agent) => {
+            {agents.filter((a) => a.payment_status === 'TRIAL' && a.trial_ends_at).map((agent) => {
               const countdown = getTrialCountdown(agent.period_end);
               if (!countdown) return null;
 

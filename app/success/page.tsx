@@ -51,7 +51,7 @@ function SuccessContent() {
       return;
     }
 
-    const isMockRef = typeof ref === 'string' && ref.startsWith('MOCK_');
+    const isMockRef = typeof ref === 'string' && ref.startsWith('MOCK-');
     const isDev = process.env.NODE_ENV === 'development';
 
     if ((isMockRef || isDev) && slugParam) {
@@ -237,6 +237,11 @@ function SuccessContent() {
                       <p className="mt-1 text-xs text-amber-700">
                         Setelah masa trial berakhir, Anda bisa upgrade ke paket berbayar untuk melanjutkan menggunakan AI Agent.
                       </p>
+                      <Button asChild size="sm" className="mt-3">
+                        <a href={`/checkout?slug=${slug}&renewal=true`}>
+                          Upgrade ke Paket Berbayar
+                        </a>
+                      </Button>
                     </div>
                   )}
 

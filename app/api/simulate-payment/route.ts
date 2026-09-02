@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, supabaseAdmin } from '@/lib/supabase';
-import { isSandbox } from '@/lib/payment';
+import { supabaseAdmin } from '@/lib/supabase';
+import { isSandbox as isIpaymuSandbox } from '@/lib/ipaymu';
 
 /**
  * POST /api/simulate-payment
- * Development-only helper. Only enabled in sandbox mode (no live Mayar keys).
- * Marks the transaction PAID and internally triggers the webhook handler so
- * the agent activation + WhatsApp + email onboarding runs exactly as it would
- * from the gateway.
+ * Development-only helper. Only enabled when iPaymu is in sandbox mode (no
+ * live iPaymu keys). Marks the transaction PAID and internally triggers the
+ * iPaymu webhook handler so the agent activation + WhatsApp + email
+ * onboarding runs exactly as it would from the real gateway callback.
  */
 export async function POST(req: NextRequest) {
   try {
-    if (!isSandbox) {
+    if (!isIpaymuSandbox) {
       return NextResponse.json(
-        { error: 'Simulate is disabled when live gateway keys are set.' },
+        { error: 'Simulate is disabled when live iPaymu keys are set.' },
         { status: 403 }
       );
     }
@@ -27,13 +27,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log('=== SIMULATE PAYMENT ===');
+    console.log('=== SIMULATE IPAYMU PAYMENT ===');
     console.log('Merchant ref:', merchantRef);
 
-    // Use supabaseAdmin to bypass RLS
     const { data: tx, error } = await supabaseAdmin
       .from('transactions')
-      .select('id, gateway_reference, status')
+      .select('id, status, reference')
       .eq('merchant_ref', merchantRef)
       .maybeSingle();
 
@@ -47,28 +46,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'Already paid' });
     }
 
-    const callbackBody = JSON.stringify({
-      external_id: tx.gateway_reference,
-      status: 'SUCCESS',
-    });
-
     const base =
-      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.NEXT_PUBLIC_BASE_URL ||
       `http://${req.headers.get('host') || 'localhost:3000'}`;
 
-    console.log('Calling webhook:', `${base}/api/webhook/payment`);
+    const callbackBody = new URLSearchParams({
+      status: 'success',
+      reference_id: merchantRef,
+      trx_id: tx.reference || `SIM-${Date.now()}`,
+    }).toString();
 
-    const webhookRes = await fetch(`${base}/api/webhook/payment`, {
+    console.log('Calling iPaymu webhook:', `${base}/api/webhooks/ipaymu`);
+
+    const webhookRes = await fetch(`${base}/api/webhooks/ipaymu`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'X-Signature': 'sandbox-signature',
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: callbackBody,
     });
 
     console.log('Webhook response status:', webhookRes.status);
-    
+
     const result = await webhookRes.json().catch(() => ({}));
     console.log('Webhook response:', result);
 

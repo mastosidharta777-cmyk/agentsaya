@@ -18,6 +18,16 @@ const IPAYMU_API_KEY = process.env.IPAYMU_API_KEY || process.env.IPAYMU_API_SAND
 const IPAYMU_VA = process.env.IPAYMU_VA || '';
 const isMockMode = !IPAYMU_API_KEY || !IPAYMU_VA;
 
+const TRIAL_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function computeNewPeriodEnd(existingPeriodEnd: string | null | undefined, periodDays: number): string {
+  const nowMs = Date.now();
+  const baseMs = existingPeriodEnd ? new Date(existingPeriodEnd).getTime() : nowMs;
+  const startMs = Math.max(baseMs, nowMs);
+  return new Date(startMs + periodDays * MS_PER_DAY).toISOString();
+}
+
 
 async function extractTextFromPDF(data: Uint8Array): Promise<string> {
   try {
@@ -486,7 +496,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const newPeriodEnd = new Date(Date.now() + planPeriodDays * 24 * 60 * 60 * 1000).toISOString();
+      const newPeriodEnd = computeNewPeriodEnd(existingAgent.period_end, planPeriodDays);
 
       const { error: updateError } = await supabaseAdmin
         .from('agents')
@@ -523,7 +533,7 @@ export async function POST(req: NextRequest) {
         owner_phone: phone,
         telegram_chat_id: telegramChatId || null,
         plan_tier: 'trial',
-        trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_ends_at: new Date(Date.now() + TRIAL_DAYS_MS).toISOString(),
         referral_code: referralCodeGenerated,
       };
 
@@ -702,7 +712,7 @@ export async function POST(req: NextRequest) {
           .from('transactions')
           .insert({
             agent_id: agentId,
-            amount: BASIC_PLAN.priceMonthly,
+            amount: amount,
             payment_method: 'mock_ipaymu',
             payment_status: 'PAID',
             status: 'PAID',
@@ -735,7 +745,7 @@ export async function POST(req: NextRequest) {
           const ipaymu = await createIpaymuPayment({
             referenceId: renewalMerchantRef,
             productName: agentName + ' (Perpanjangan)',
-            price: BASIC_PLAN.priceMonthly,
+            price: amount,
             buyerName: name,
             buyerEmail: email,
             buyerPhone: phone,
@@ -757,7 +767,7 @@ export async function POST(req: NextRequest) {
           .from('transactions')
           .insert({
             agent_id: agentId,
-            amount: BASIC_PLAN.priceMonthly,
+            amount: amount,
             payment_method: 'ipaymu',
             payment_status: 'PENDING',
             status: 'UNPAID',
