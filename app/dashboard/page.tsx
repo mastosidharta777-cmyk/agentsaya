@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bot, Copy, Check, Calendar, Gift, LogOut, Edit, Save, X, Users, AlertTriangle, Clock, Sparkles } from 'lucide-react';
+import { Bot, Copy, Check, Calendar, Gift, LogOut, Edit, Save, X, Users, AlertTriangle, Clock, Sparkles, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -46,6 +46,7 @@ export default function DashboardPage() {
   const [editFormData, setEditFormData] = useState({
     knowledge_base: '',
   });
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,6 +155,35 @@ export default function DashboardPage() {
   const handleCancel = () => {
     setEditingAgent(null);
     setEditFormData({ knowledge_base: '' });
+  };
+
+  const handleDelete = async (agentId: string) => {
+    const confirmed = window.confirm('Hapus agent ini permanen? Tautan chat, embed code, dan data lead yang terkait juga akan dihapus.');
+    if (!confirmed) return;
+    setDeletingId(agentId);
+    setError(null);
+    try {
+      const res = await fetch('/api/dashboard/delete-agent', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId, contact }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        console.error('Delete agent API error:', text);
+        const data = text ? JSON.parse(text) : {};
+        throw new Error(data.error || 'Gagal menghapus agent');
+      }
+
+      setAgents(prev => prev.filter(a => a.id !== agentId));
+      setLeads(prev => prev.filter(l => l.agent_id !== agentId));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Gagal menghapus agent';
+      setError(message);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const getDaysRemaining = (periodEnd: string | null) => {
@@ -366,13 +396,28 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       {editingAgent !== agent.id && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleEdit(agent)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEdit(agent)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleDelete(agent.id)}
+                            disabled={deletingId === agent.id}
+                          >
+                            {deletingId === agent.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </CardHeader>
