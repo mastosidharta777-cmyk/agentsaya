@@ -18,29 +18,49 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if contact matches email or phone pattern
-    const isEmail = contact.includes('@');
-    const isPhone = !isEmail;
+    const normalizedContact = String(contact).trim();
+    const isEmail = normalizedContact.includes('@');
 
-    // Query agents by email or phone
-    const { data: agents, error } = await supabaseAdmin
-      .from('agents')
-      .select('*')
-      .or(isEmail ? `owner_email.eq.${contact}` : `owner_phone.eq.${contact}`);
+    console.log('[DASHBOARD AUTH] normalizedContact:', normalizedContact, 'isEmail:', isEmail);
+
+    let agents: any[] = [];
+    let error: any = null;
+
+    if (isEmail) {
+      const result = await supabaseAdmin
+        .from('agents')
+        .select('*')
+        .eq('owner_email', normalizedContact);
+
+      agents = result.data || [];
+      error = result.error;
+    } else {
+      const result = await supabaseAdmin
+        .from('agents')
+        .select('*')
+        .eq('owner_phone', normalizedContact);
+
+      agents = result.data || [];
+      error = result.error;
+    }
 
     if (error) {
+      console.error('[DASHBOARD AUTH] Supabase error:', error);
       return NextResponse.json(
-        { error: 'Failed to lookup agents' },
+        { error: 'Failed to lookup agents', details: error.message || String(error) },
         { status: 500 }
       );
     }
 
     if (!agents || agents.length === 0) {
+      console.log('[DASHBOARD AUTH] No agents found for contact:', normalizedContact);
       return NextResponse.json(
         { error: 'No agents found for this contact' },
         { status: 404 }
       );
     }
+
+    console.log('[DASHBOARD AUTH] Found agents:', agents.length);
 
     const sortedAgents = agents
       .map((a) => ({
@@ -58,9 +78,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       agents: sortedAgents,
-      contact,
+      contact: normalizedContact,
     });
   } catch (err: unknown) {
+    console.error('[DASHBOARD AUTH] Server error:', err);
     const message = err instanceof Error ? err.message : 'Unknown error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
