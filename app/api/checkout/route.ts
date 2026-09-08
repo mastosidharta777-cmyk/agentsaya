@@ -748,6 +748,11 @@ export async function POST(req: NextRequest) {
         const notifyUrl = `${baseUrl}/api/webhooks/ipaymu`;
         const cancelUrl = `${baseUrl}/`;
 
+        const hasIpaymuVa = !!process.env.IPAYMU_VA;
+        const hasIpaymuKey = !!process.env.IPAYMU_API_KEY || !!process.env.IPAYMU_API_SANDBOX_KEY;
+        const ipaymuMode = process.env.IPAYMU_MODE || 'sandbox';
+        console.log('[CHECKOUT] iPaymu env check:', { hasIpaymuVa, hasIpaymuKey, ipaymuMode, baseUrl });
+
         let paymentUrl = '';
         let paymentSandbox = true;
 
@@ -767,8 +772,18 @@ export async function POST(req: NextRequest) {
           paymentSandbox = ipaymu.sandbox;
         } catch (payErr) {
           console.error('[CHECKOUT] iPaymu renewal payment creation failed:', payErr);
+          const errorMessage = payErr instanceof Error ? payErr.message : String(payErr);
           return NextResponse.json(
-            { error: 'Gagal membuat link pembayaran perpanjangan. Silakan coba lagi.' },
+            {
+              error: 'Gagal membuat link pembayaran perpanjangan. Silakan coba lagi.',
+              debug: {
+                message: errorMessage,
+                hasIpaymuVa,
+                hasIpaymuKey,
+                ipaymuMode,
+                baseUrl: baseUrl || '(empty)',
+              }
+            },
             { status: 500 }
           );
         }
