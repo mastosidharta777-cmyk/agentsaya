@@ -393,6 +393,11 @@ export default function DashboardPage() {
                               {daysRemaining} hari tersisa
                             </Badge>
                           )}
+                          {agent.payment_status === 'TRIAL' && (
+                            <Button asChild size="sm" variant="outline" className="h-7 text-xs">
+                              <a href={`/checkout?slug=${agent.custom_agent_slug}&renewal=true`}>Upgrade</a>
+                            </Button>
+                          )}
                         </div>
                       </div>
                       {editingAgent !== agent.id && (
