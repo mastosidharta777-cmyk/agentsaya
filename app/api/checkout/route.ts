@@ -111,8 +111,10 @@ async function ocrSpaceText(data: Uint8Array, mimeType: string): Promise<string>
 export async function POST(req: NextRequest) {
   let slug: string = '';
   let slugFromForm: string = '';
+  console.log('[CHECKOUT] Request received');
   try {
     const contentType = req.headers.get('content-type') || '';
+    console.log('[CHECKOUT] Content-Type:', contentType);
     
     let agentName: string = '';
     let knowledgeBase: string = '';
@@ -310,8 +312,11 @@ export async function POST(req: NextRequest) {
       pdfText = body.pdfText || '';
     }
 
+    console.log('[CHECKOUT] Parsed fields:', { agentName: !!agentName, email: !!email, phone: !!phone, planType, renewal, slugFromForm: !!slugFromForm, pdfText: !!pdfText });
+
     if (!slug && slugFromForm) {
       slug = slugFromForm;
+      console.log('[CHECKOUT] Using slug from request body:', slug);
     }
 
     if (!agentName || !name || !email || !phone) {
@@ -492,11 +497,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (isRenewal) {
+      console.log('[CHECKOUT] Renewal mode for slug:', slug);
       const { data: existingAgent, error: existingError } = await supabaseAdmin
         .from('agents')
         .select('id, payment_status, period_end, plan_tier')
         .eq('custom_agent_slug', slug)
         .maybeSingle();
+
+      console.log('[CHECKOUT] Renewal lookup result:', { existingAgent: !!existingAgent, existingError });
 
       if (existingError || !existingAgent) {
         console.error('[CHECKOUT] Renewal agent lookup error:', existingError);
