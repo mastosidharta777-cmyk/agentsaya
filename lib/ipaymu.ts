@@ -196,3 +196,9 @@ function sanitizeUrlForIpaymu(url: string): string {
     return url;
   }
 }
+
+export function buildIpaymuUrl(baseUrl: string, path: string): string {
+  const cleanBase = baseUrl.replace(/\/+$/, '');
+  const cleanPath = path.replace(/^\/+/, '');
+  return `${cleanBase}/${cleanPath}`;
+}

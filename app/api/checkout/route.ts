@@ -3,6 +3,7 @@ import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { BASIC_PLAN, TRIAL_PLAN, YEARLY_PLAN, formatRupiah } from '@/lib/plans';
 import { slugify, randomSuffix, buildSystemPrompt, generateReferralCode } from '@/lib/agents';
 import { createIpaymuPayment } from '@/lib/ipaymu';
+import { buildIpaymuUrl } from '@/lib/ipaymu';
 import { extractText } from 'unpdf';
 import { cleanKnowledgeBaseWithLLM } from '@/lib/llm';
 
@@ -665,10 +666,10 @@ export async function POST(req: NextRequest) {
         paymentIsSandbox = true;
       } else {
         console.log('[CHECKOUT] API Key terdeteksi. Memanggil iPaymu...');
-        const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_BASE_URL || 'https://example.com';
-        const returnUrl = `${origin}/success?ref=ipaymu&slug=${slug}`;
-        const notifyUrl = `${origin}/api/webhooks/ipaymu`;
-        const cancelUrl = `${origin}/`;
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || req.headers.get('origin') || 'https://example.com';
+        const returnUrl = buildIpaymuUrl(baseUrl, '/success?ref=ipaymu&slug=' + slug);
+        const notifyUrl = buildIpaymuUrl(baseUrl, '/api/webhooks/ipaymu');
+        const cancelUrl = buildIpaymuUrl(baseUrl, '/');
 
         let paymentUrl = '';
         let paymentSandbox = true;
@@ -752,9 +753,9 @@ export async function POST(req: NextRequest) {
       } else {
         console.log('[CHECKOUT] Renewal mode. Memanggil iPaymu...');
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || '';
-        const returnUrl = `${baseUrl}/success?ref=ipaymu&slug=${slug}`;
-        const notifyUrl = `${baseUrl}/api/webhooks/ipaymu`;
-        const cancelUrl = `${baseUrl}/`;
+        const returnUrl = buildIpaymuUrl(baseUrl, '/success?ref=ipaymu&slug=' + slug);
+        const notifyUrl = buildIpaymuUrl(baseUrl, '/api/webhooks/ipaymu');
+        const cancelUrl = buildIpaymuUrl(baseUrl, '/');
 
         const hasIpaymuVa = !!process.env.IPAYMU_VA;
         const hasIpaymuKey = !!process.env.IPAYMU_API_KEY || !!process.env.IPAYMU_API_SANDBOX_KEY;
