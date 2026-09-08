@@ -110,6 +110,7 @@ async function ocrSpaceText(data: Uint8Array, mimeType: string): Promise<string>
 
 export async function POST(req: NextRequest) {
   let slug: string = '';
+  let slugFromForm: string = '';
   try {
     const contentType = req.headers.get('content-type') || '';
     
@@ -140,6 +141,7 @@ export async function POST(req: NextRequest) {
       planType = (formData.get('planType') as string) as 'trial' | 'monthly' | 'yearly' || 'monthly';
       additionalNotes = formData.get('additionalNotes') as string || '';
       renewal = formData.get('renewal') === 'true';
+      slugFromForm = formData.get('slug') as string || '';
       
       const pdfFile = formData.get('pdfFile') as File | null;
       
@@ -304,6 +306,12 @@ export async function POST(req: NextRequest) {
       phone = body.phone || '';
       referralCode = body.referralCode || '';
       planType = body.planType || 'monthly';
+      slugFromForm = body.slug || '';
+      pdfText = body.pdfText || '';
+    }
+
+    if (!slug && slugFromForm) {
+      slug = slugFromForm;
     }
 
     if (!agentName || !name || !email || !phone) {
@@ -366,24 +374,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    slug = slugify(agentName) || 'agent';
-    try {
-      for (let attempt = 0; attempt < 5; attempt++) {
-        const { data: existing, error: slugError } = await supabaseAdmin
-          .from('agents')
-          .select('custom_agent_slug')
-          .eq('custom_agent_slug', slug)
-          .maybeSingle();
-        
-        if (existing) {
-          slug = slugify(agentName) + '-' + randomSuffix(4);
-        } else {
-          break;
+    if (!slug) {
+      slug = slugify(agentName) || 'agent';
+      try {
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const { data: existing, error: slugError } = await supabaseAdmin
+            .from('agents')
+            .select('custom_agent_slug')
+            .eq('custom_agent_slug', slug)
+            .maybeSingle();
+          
+          if (existing) {
+            slug = slugify(agentName) + '-' + randomSuffix(4);
+          } else {
+            break;
+          }
         }
+      } catch (slugError) {
+        console.error('[CHECKOUT] Slug generation error:', slugError);
+        slug = slugify(agentName) + '-' + randomSuffix(4);
       }
-    } catch (slugError) {
-      console.error('[CHECKOUT] Slug generation error:', slugError);
-      slug = slugify(agentName) + '-' + randomSuffix(4);
     }
 
     const referralCodeGenerated = generateReferralCode();
