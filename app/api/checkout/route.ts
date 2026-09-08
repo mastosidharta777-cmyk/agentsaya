@@ -667,7 +667,7 @@ export async function POST(req: NextRequest) {
       } else {
         console.log('[CHECKOUT] API Key terdeteksi. Memanggil iPaymu...');
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || req.headers.get('origin') || 'https://example.com';
-        const returnUrl = buildIpaymuUrl(baseUrl, '/success?ref=ipaymu&slug=' + slug);
+        const returnUrl = 'https://www.agentsaya.site/success?ref=ipaymu&slug=' + slug;
         const notifyUrl = buildIpaymuUrl(baseUrl, '/api/webhooks/ipaymu');
         const cancelUrl = buildIpaymuUrl(baseUrl, '/');
 
