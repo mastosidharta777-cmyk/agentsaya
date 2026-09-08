@@ -4,18 +4,30 @@ import { supabase } from '@/lib/supabase';
 import { CheckoutForm } from '@/components/CheckoutForm';
 
 interface CheckoutPageProps {
-  params: { slug: string };
-  searchParams: { renewal?: string; plan?: string };
+  searchParams: { slug?: string; renewal?: string; plan?: string };
 }
 
-export default async function CheckoutPage({ params, searchParams }: CheckoutPageProps) {
+export default async function CheckoutPage({ searchParams }: CheckoutPageProps) {
   const isRenewal = searchParams.renewal === 'true';
   const preselectedPlan = (searchParams.plan as 'trial' | 'monthly' | 'yearly') || (isRenewal ? 'monthly' : 'trial');
+  const slug = searchParams.slug;
+
+  if (!slug) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-primary/5 flex items-center justify-center p-4">
+        <div className="max-w-md w-full text-center bg-white rounded-2xl shadow-xl p-8">
+          <h1 className="text-2xl font-bold mb-2">Agent Tidak Ditemukan</h1>
+          <p className="text-muted-foreground mb-6">Parameter agent tidak valid.</p>
+          <Link href="/" className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90">Kembali ke Beranda</Link>
+        </div>
+      </div>
+    );
+  }
 
   const { data: agent } = await supabase
     .from('agents')
     .select('id, agent_name, custom_agent_slug, owner_name, owner_email, owner_phone, payment_status, period_end, plan_tier, welcome_message, knowledge_base')
-    .eq('custom_agent_slug', params.slug)
+    .eq('custom_agent_slug', slug)
     .maybeSingle();
 
   if (!agent) {
