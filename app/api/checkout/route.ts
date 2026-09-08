@@ -781,16 +781,18 @@ export async function POST(req: NextRequest) {
         } catch (payErr) {
           console.error('[CHECKOUT] iPaymu renewal payment creation failed:', payErr);
           const errorMessage = payErr instanceof Error ? payErr.message : String(payErr);
+          const debugInfo = {
+            message: errorMessage,
+            hasIpaymuVa,
+            hasIpaymuKey,
+            ipaymuMode,
+            baseUrl: baseUrl || '(empty)',
+          };
+          console.error('[CHECKOUT] Renewal debug:', JSON.stringify(debugInfo));
           return NextResponse.json(
             {
-              error: 'Gagal membuat link pembayaran perpanjangan. Silakan coba lagi.',
-              debug: {
-                message: errorMessage,
-                hasIpaymuVa,
-                hasIpaymuKey,
-                ipaymuMode,
-                baseUrl: baseUrl || '(empty)',
-              }
+              error: 'Gagal membuat link pembayaran perpanjangan: ' + errorMessage,
+              debug: debugInfo,
             },
             { status: 500 }
           );
