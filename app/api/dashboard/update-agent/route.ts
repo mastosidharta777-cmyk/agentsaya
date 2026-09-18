@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { getSessionUser } from '@/lib/dashboard-session';
 import { buildSystemPrompt } from '@/lib/agents';
 import { extractText } from 'unpdf';
 
@@ -23,6 +24,11 @@ async function extractTextFromPDF(data: Uint8Array): Promise<string> {
  * Updates agent knowledge base and regenerates system prompt
  */
 export async function POST(req: NextRequest) {
+  const user = await getSessionUser(req);
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     // Check if request is multipart/form-data (file upload) or JSON
     const contentType = req.headers.get('content-type') || '';
@@ -111,7 +117,7 @@ export async function POST(req: NextRequest) {
     // Get current agent data using admin client to bypass RLS
     const { data: agent, error: fetchError } = await supabaseAdmin
       .from('agents')
-      .select('agent_name, welcome_message, owner_name, owner_phone')
+      .select('agent_name, welcome_message, owner_name, owner_phone, owner_email')
       .eq('id', agentId)
       .maybeSingle();
 
@@ -136,6 +142,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Agent not found' },
         { status: 404 }
+      );
+    }
+
+    const ownerEmail = String(agent.owner_email || '').trim().toLowerCase();
+    if (ownerEmail !== user.email) {
+      return NextResponse.json(
+        { error: 'Forbidden: you do not own this agent' },
+        { status: 403 }
       );
     }
 

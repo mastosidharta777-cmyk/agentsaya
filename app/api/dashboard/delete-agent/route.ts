@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { getSessionUser } from '@/lib/dashboard-session';
 
 export async function DELETE(req: NextRequest) {
+  const user = await getSessionUser(req);
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
-    const { agentId, contact } = body as { agentId?: string; contact?: string };
+    const { agentId } = body as { agentId?: string };
 
-    if (!agentId || !contact) {
-      return NextResponse.json({ error: 'agentId and contact are required' }, { status: 400 });
+    if (!agentId) {
+      return NextResponse.json(
+        { error: 'agentId and contact are required' },
+        { status: 400 }
+      );
     }
 
     const { data: agent, error: fetchError } = await supabaseAdmin
@@ -25,15 +34,8 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
     }
 
-    const normalizedContact = String(contact).trim().toLowerCase();
     const ownerEmail = String(agent.owner_email || '').trim().toLowerCase();
-    const ownerPhone = String(agent.owner_phone || '').trim().toLowerCase();
-
-    const isOwner =
-      normalizedContact === ownerEmail ||
-      normalizedContact === ownerPhone ||
-      normalizedContact === ownerEmail.replace(/^\+?62/, '0') ||
-      normalizedContact === ownerPhone.replace(/^\+?62/, '0');
+    const isOwner = ownerEmail === user.email;
 
     if (!isOwner) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

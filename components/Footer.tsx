@@ -32,8 +32,7 @@ export function Footer() {
               Kontak
             </h4>
             <ul className="mt-3 space-y-2 text-sm text-secondary-foreground/70">
-              <li>halo@agentsaya.site</li>
-              <li>+62 812 0000 0000</li>
+              <li>kontak@agentsaya.site</li>
               <li>Jakarta, Indonesia</li>
             </ul>
           </div>
@@ -43,7 +42,7 @@ export function Footer() {
               Legal
             </h4>
             <ul className="mt-3 space-y-2 text-sm">
-              <li><a href="/terms" className="text-secondary-foreground/70 hover:text-primary">Syarat & Ketentian</a></li>
+              <li><a href="/terms" className="text-secondary-foreground/70 hover:text-primary">Syarat & Ketentuan</a></li>
               <li><a href="/privacy" className="text-secondary-foreground/70 hover:text-primary">Kebijakan Privasi</a></li>
             </ul>
           </div>

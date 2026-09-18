@@ -1,87 +1,65 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 
-/**
- * POST /api/dashboard/auth
- * Simple authentication for dashboard access.
- * Users can authenticate by providing their registered WhatsApp number or email.
- */
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { contact } = body as { contact?: string };
+    const { email } = body as { email?: string };
 
-    if (!contact) {
+    if (!email || !EMAIL_REGEX.test(String(email).trim())) {
       return NextResponse.json(
-        { error: 'Contact (email or phone) is required' },
+        { error: 'Email valid diperlukan' },
         { status: 400 }
       );
     }
 
-    const normalizedContact = String(contact).trim();
-    const isEmail = normalizedContact.includes('@');
+    const normalizedEmail = String(email).trim().toLowerCase();
 
-    console.log('[DASHBOARD AUTH] normalizedContact:', normalizedContact, 'isEmail:', isEmail);
+    const { count, error: lookupError } = await supabaseAdmin
+      .from('agents')
+      .select('id', { count: 'exact', head: true })
+      .eq('owner_email', normalizedEmail);
 
-    let agents: any[] = [];
-    let error: any = null;
-
-    if (isEmail) {
-      const result = await supabaseAdmin
-        .from('agents')
-        .select('*')
-        .eq('owner_email', normalizedContact);
-
-      agents = result.data || [];
-      error = result.error;
-    } else {
-      const result = await supabaseAdmin
-        .from('agents')
-        .select('*')
-        .eq('owner_phone', normalizedContact);
-
-      agents = result.data || [];
-      error = result.error;
-    }
-
-    if (error) {
-      console.error('[DASHBOARD AUTH] Supabase error:', error);
+    if (lookupError) {
+      console.error('[DASHBOARD AUTH] agents lookup error:', lookupError);
       return NextResponse.json(
-        { error: 'Failed to lookup agents', details: error.message || String(error) },
+        { error: 'Gagal memverifikasi email' },
         { status: 500 }
       );
     }
 
-    if (!agents || agents.length === 0) {
-      console.log('[DASHBOARD AUTH] No agents found for contact:', normalizedContact);
+    if (!count || count === 0) {
       return NextResponse.json(
-        { error: 'No agents found for this contact' },
+        { error: 'Tidak ada agent yang terdaftar untuk email ini' },
         { status: 404 }
       );
     }
 
-    console.log('[DASHBOARD AUTH] Found agents:', agents.length);
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      `${req.nextUrl.protocol}//${req.nextUrl.host}`;
 
-    const sortedAgents = agents
-      .map((a) => ({
-        ...a,
-        total_referred: 0,
-      }))
-      .sort((a, b) => {
-        const aActive = a.payment_status === 'PAID' && (!a.period_end || new Date(a.period_end) > new Date());
-        const bActive = b.payment_status === 'PAID' && (!b.period_end || new Date(b.period_end) > new Date());
-        if (aActive && !bActive) return -1;
-        if (!aActive && bActive) return 1;
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      });
+    const { error: otpError } = await supabaseAdmin.auth.signInWithOtp({
+      email: normalizedEmail,
+      options: { emailRedirectTo: `${appUrl}/api/auth/callback` },
+    });
+
+    if (otpError) {
+      console.error('[DASHBOARD AUTH] signInWithOtp error:', otpError);
+      return NextResponse.json(
+        { error: 'Gagal mengirim magic link' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
-      success: true,
-      agents: sortedAgents,
-      contact: normalizedContact,
+      ok: true,
+      message: 'Magic link telah dikirim ke email Anda',
     });
   } catch (err: unknown) {
-    console.error('[DASHBOARD AUTH] Server error:', err);
+    console.error('[DASHBOARD AUTH] server error:', err);
     const message = err instanceof Error ? err.message : 'Unknown error';
     return NextResponse.json({ error: message }, { status: 500 });
   }

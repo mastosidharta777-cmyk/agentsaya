@@ -336,7 +336,7 @@ function SuccessContent() {
 
                   <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-4 text-center">
                     <p className="text-xs font-medium text-primary">
-                      Login Dashboard menggunakan Email atau WhatsApp yang terdaftar saat pembelian
+                      Login Dashboard menggunakan email yang terdaftar saat pembelian
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Link & embed code juga dikirim ke WhatsApp & email Anda.
