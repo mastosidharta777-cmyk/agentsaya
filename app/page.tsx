@@ -5,6 +5,7 @@ import { HowItWorks } from '@/components/HowItWorks';
 import { AgentBuilderForm } from '@/components/AgentBuilderForm';
 import { FAQ } from '@/components/FAQ';
 import { Footer } from '@/components/Footer';
+import { AuthHashHandler } from '@/components/AuthHashHandler';
 
 export default function Home() {
   return (
@@ -18,6 +19,7 @@ export default function Home() {
         <FAQ />
       </main>
       <Footer />
+      <AuthHashHandler />
     </>
   );
 }
