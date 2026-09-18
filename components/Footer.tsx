@@ -37,6 +37,16 @@ export function Footer() {
               <li>Jakarta, Indonesia</li>
             </ul>
           </div>
+
+          <div>
+            <h4 className="font-display text-sm font-semibold uppercase tracking-wide text-secondary-foreground/60">
+              Legal
+            </h4>
+            <ul className="mt-3 space-y-2 text-sm">
+              <li><a href="/terms" className="text-secondary-foreground/70 hover:text-primary">Syarat & Ketentian</a></li>
+              <li><a href="/privacy" className="text-secondary-foreground/70 hover:text-primary">Kebijakan Privasi</a></li>
+            </ul>
+          </div>
         </div>
 
         <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-secondary-foreground/10 pt-6 text-xs text-secondary-foreground/60 sm:flex-row">
