@@ -155,7 +155,8 @@ export async function POST(req: NextRequest) {
 
     // Use provided values or fallback to existing values
     const safeAgentName = agentName || agent.agent_name || 'Agent';
-    const safeWelcomeMessage = welcomeMessage || agent.welcome_message || 'Halo!';
+    const defaultWelcome = `Halo! Saya Asisten Virtual (${safeAgentName}). Ada yang bisa saya bantu hari ini?`;
+    const safeWelcomeMessage = welcomeMessage || agent.welcome_message || defaultWelcome;
     const manualKnowledgeBase = knowledgeBase || '';
     
     // Combine PDF text with manual knowledge base

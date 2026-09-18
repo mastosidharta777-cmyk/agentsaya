@@ -25,8 +25,8 @@ interface CheckoutPayload {
   sandbox: boolean;
 }
 
-const DEFAULT_WELCOME = (name: string) =>
-  `Halo! Saya Asisten Virtual ${name || 'AI'}. Ada yang bisa saya bantu hari ini?`;
+const DEFAULT_WELCOME = (agentName: string) =>
+  `Halo! Saya Asisten Virtual (${agentName || 'AI'}). Ada yang bisa saya bantu hari ini?`;
 
 export function AgentBuilderForm() {
   const searchParams = useSearchParams();

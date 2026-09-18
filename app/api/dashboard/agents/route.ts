@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const { data: agents, error } = await supabaseAdmin
     .from('agents')
     .select(
-      'id, agent_name, custom_agent_slug, payment_status, period_end, trial_ends_at, knowledge_base, referral_code, referral_bonus_days, created_at'
+      'id, agent_name, custom_agent_slug, payment_status, period_end, trial_ends_at, knowledge_base, welcome_message, referral_code, referral_bonus_days, created_at'
     )
     .eq('owner_email', user.email)
     .order('created_at', { ascending: false });

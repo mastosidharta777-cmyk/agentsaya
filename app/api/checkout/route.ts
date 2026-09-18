@@ -328,7 +328,7 @@ export async function POST(req: NextRequest) {
     }
 
     const manualKnowledgeBase = knowledgeBase?.trim() || '';
-    const welcome = welcomeMessage?.trim() || 'Halo! Saya Asisten Virtual ' + agentName + '. Ada yang bisa saya bantu hari ini?';
+    const welcome = welcomeMessage?.trim() || `Halo! Saya Asisten Virtual (${agentName}). Ada yang bisa saya bantu hari ini?`;
     const safeWelcomeMessage = welcome || '';
     
     let combinedKnowledgeBase = manualKnowledgeBase;

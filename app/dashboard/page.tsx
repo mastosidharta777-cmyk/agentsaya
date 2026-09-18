@@ -35,6 +35,7 @@ interface Agent {
   period_end: string | null;
   trial_ends_at: string | null;
   knowledge_base: string;
+  welcome_message: string;
   referral_code: string;
   referral_bonus_days: number;
   created_at: string;
@@ -75,6 +76,7 @@ export default function DashboardPage() {
   const [editingAgent, setEditingAgent] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState({
     knowledge_base: '',
+    welcome_message: '',
   });
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -241,7 +243,10 @@ export default function DashboardPage() {
 
   const handleEdit = (agent: Agent) => {
     setEditingAgent(agent.id);
-    setEditFormData({ knowledge_base: agent.knowledge_base });
+    setEditFormData({
+      knowledge_base: agent.knowledge_base,
+      welcome_message: agent.welcome_message || '',
+    });
   };
 
   const handleSave = async (agentId: string) => {
@@ -255,6 +260,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           agentId,
           knowledgeBase: editFormData.knowledge_base,
+          welcomeMessage: editFormData.welcome_message,
         }),
       });
 
@@ -283,7 +289,7 @@ export default function DashboardPage() {
 
   const handleCancel = () => {
     setEditingAgent(null);
-    setEditFormData({ knowledge_base: '' });
+    setEditFormData({ knowledge_base: '', welcome_message: '' });
   };
 
   const handleDelete = async (agentId: string) => {
@@ -672,11 +678,30 @@ export default function DashboardPage() {
                               value={editFormData.knowledge_base}
                               onChange={(e) =>
                                 setEditFormData({
+                                  ...editFormData,
                                   knowledge_base: e.target.value,
                                 })
                               }
                               rows={6}
                               className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="welcome_message">
+                              Welcome Message
+                            </Label>
+                            <Textarea
+                              id="welcome_message"
+                              value={editFormData.welcome_message}
+                              onChange={(e) =>
+                                setEditFormData({
+                                  ...editFormData,
+                                  welcome_message: e.target.value,
+                                })
+                              }
+                              rows={2}
+                              className="mt-1"
+                              placeholder="Halo! Saya Asisten Virtual (Nama Agent). Ada yang bisa saya bantu hari ini?"
                             />
                           </div>
                           <div className="flex gap-2">

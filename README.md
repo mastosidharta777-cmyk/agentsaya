@@ -78,5 +78,5 @@ npm run dev
 
 Template default welcome message:
 ```
-Halo! Saya Asisten Virtual {agentName}. Ada yang bisa saya bantu hari ini?
+Halo! Saya Asisten Virtual ({agentName}). Ada yang bisa saya bantu hari ini?
 ```
