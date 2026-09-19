@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSessionUser } from '@/lib/dashboard-session';
 
+const LEADS_COLUMNS =
+  'id, agent_id, customer_name, customer_phone, message_summary, source, created_at';
+
+const isDataUnavailableError = (err: { code?: string; message?: string }): boolean => {
+  const code = err?.code;
+  const message = err?.message || '';
+  const notFoundCodes = ['42P01', '42703', 'PGRST106', 'PGRST116'];
+  return (
+    notFoundCodes.includes(code || '') ||
+    /does not exist|not found|no rows|undefined table|undefined column/i.test(message)
+  );
+};
+
 export async function GET(req: NextRequest) {
   const user = await getSessionUser(req);
   if (!user) {
@@ -29,15 +42,18 @@ export async function GET(req: NextRequest) {
 
   const { data: leads, error: leadsError } = await supabaseAdmin
     .from('leads')
-    .select(
-      'id, agent_id, customer_name, customer_phone, message_summary, source, created_at'
-    )
+    .select(LEADS_COLUMNS)
     .in('agent_id', agentIds)
     .order('created_at', { ascending: false })
     .limit(100);
 
   if (leadsError) {
     console.error('[DASHBOARD LEADS] leads lookup error:', leadsError);
+
+    if (isDataUnavailableError(leadsError)) {
+      return NextResponse.json({ leads: [] });
+    }
+
     return NextResponse.json(
       { error: 'Failed to fetch leads' },
       { status: 500 }
