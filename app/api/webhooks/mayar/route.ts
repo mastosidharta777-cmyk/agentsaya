@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     try { payload = JSON.parse(raw); }
     catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
-    const event = payload.event ?? payload['event.received'];
+    const event = (payload.event && typeof payload.event === 'object' ? (payload.event as Record<string, unknown>).received : payload.event) ?? payload['event.received'];
     if (event !== 'payment.received') return NextResponse.json({ received: true, ignored: true });
 
     const data = (payload.data && typeof payload.data === 'object' ? payload.data : {}) as Record<string, unknown>;
