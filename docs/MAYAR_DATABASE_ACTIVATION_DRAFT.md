@@ -40,11 +40,8 @@ declare
   v_days integer;
   v_now timestamptz := transaction_timestamp();
 begin
-  -- Only trusted backend service_role can call; webhook first verifies via
-  -- Mayar API. Never accept an unauthenticated client-side payment status.
-  if auth.role() is distinct from 'service_role' then
-    raise exception 'forbidden';
-  end if;
+  -- Only grant EXECUTE to service_role (enforced by function privileges).
+  -- The trusted backend must verify the payment with Mayar first.
 
   select * into v_tx from public.transactions
    where merchant_ref = p_merchant_ref and reference = p_provider_transaction_id
@@ -95,7 +92,7 @@ commit;
 ```
 
 ## Before approval
-- Verify grants, actual RPC signature, legacy webhook reliance, and whether `auth.role()` check works with the Supabase service client.
+- Verify grants, actual RPC signature, and legacy webhook reliance; only the service-role backend may invoke this function.
 - Existing schema includes defaults with `status='SUCCESS'` and `payment_method='MOCK'`; explicit values are required on all paid order inserts.
 - Confirm database types and uniqueness against actual existing data; create migration in CLI then test in disposable environment before applying.
 - Simulate concurrent duplicate webhooks (only one 30/365-day extension), new PENDING agent, trial upgrade, renewal while active, renewal while expired, wrong amount, wrong email, replay, invalid plan, and missing API credentials.
