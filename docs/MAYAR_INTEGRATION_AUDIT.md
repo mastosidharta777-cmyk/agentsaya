@@ -32,7 +32,8 @@ Date: 2026-11-07. Work branch: `feature/mayar-production-checkout-20261107`.
 - [x] Dedicated Git branch created without changing main.
 - [x] Mayar API v2 invoice/transaction client written.
 - [ ] Inspect AgentSaya Supabase schema, payment constraints, `activate_agent` SQL, and migration history.
-- [ ] Implement pending checkout for new and renewal, provider ID storage, webhook/reconciliation and atomic activation.
+- [x] Drafted pending Mayar checkout for new and renewal with provider transaction ID stored in existing reference field; **database compatibility and build not yet validated**.
+- [ ] Implement verified Mayar webhook/reconciliation and atomic activation after checking the AgentSaya database schema.
 - [ ] Verify if the Mayar account already has a webhook consumer (shared-merchant safety).
 - [ ] Verify signed-in renewal ownership and prevent arbitrary-slug upgrades.
 - [ ] Build/typecheck + mock-provider tests for unpaid, paid, duplicate webhook, amount mismatch, annual renewal, replay, cancellation and expiry.
@@ -46,3 +47,9 @@ Date: 2026-11-07. Work branch: `feature/mayar-production-checkout-20261107`.
 - https://docs.mayar.id/integration/webhook
 
 No live Mayar invoice was created, merchant webhook configuration was not changed, and no production deploy was performed.
+
+## Changes after audit (unverified draft)
+- Checkout uses Mayar instead of iPaymu for paid orders and fails closed if MAYAR_API_KEY is absent.
+- New paid agents are staged with payment_status=PENDING, status=pending and null subscription dates; database constraints still need checking.
+- Renewal checkout no longer changes subscription before payment; the existing iPaymu activation webhook does not handle Mayar payments.
+- **DO NOT MERGE** until schema compatibility, activation RPC, annual and renewal periods, webhook verification and end-to-end tests pass.
