@@ -642,6 +642,13 @@ export async function POST(req: NextRequest) {
         console.error('[CHECKOUT] Failed to persist Mayar transaction', transactionError);
         return NextResponse.json({ error: 'Gagal menyimpan transaksi pembayaran.' }, { status: 500 });
       }
+      const { error: linkError } = await supabaseAdmin.from('agents')
+        .update({ transaction_id: (await supabaseAdmin.from('transactions').select('id').eq('merchant_ref', merchantRef).single()).data?.id })
+        .eq('id', agentId!);
+      if (linkError) {
+        console.error('[CHECKOUT] Failed to link pending transaction to agent', linkError);
+        return NextResponse.json({ error: 'Gagal menghubungkan transaksi.' }, { status: 500 });
+      }
       transactionId = merchantRef;
       redirectUrl = invoice.link;
       paymentIsSandbox = false;
