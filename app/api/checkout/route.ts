@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { BASIC_PLAN, TRIAL_PLAN, YEARLY_PLAN, formatRupiah } from '@/lib/plans';
 import { slugify, randomSuffix, buildSystemPrompt, generateReferralCode } from '@/lib/agents';
-import { createIpaymuPayment } from '@/lib/ipaymu';
-import { buildIpaymuUrl } from '@/lib/ipaymu';
+import { createMayarInvoice } from '@/lib/mayar';
 import { extractText } from 'unpdf';
 import { cleanKnowledgeBaseWithLLM } from '@/lib/llm';
 
@@ -15,9 +14,6 @@ const cleanPayloadText = (str: string) => {
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 };
 
-const IPAYMU_API_KEY = process.env.IPAYMU_API_KEY || process.env.IPAYMU_API_SANDBOX_KEY || '';
-const IPAYMU_VA = process.env.IPAYMU_VA || '';
-const isMockMode = !IPAYMU_API_KEY || !IPAYMU_VA;
 
 const TRIAL_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -515,25 +511,8 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const newPeriodEnd = computeNewPeriodEnd(existingAgent.period_end, planPeriodDays);
-
-      const { error: updateError } = await supabaseAdmin
-        .from('agents')
-        .update({
-          payment_status: 'PAID',
-          period_end: newPeriodEnd,
-          plan_tier: planType === 'yearly' ? 'yearly' : 'basic',
-        })
-        .eq('id', existingAgent.id);
-
-      if (updateError) {
-        console.error('[CHECKOUT] Renewal agent update error:', updateError);
-        return NextResponse.json(
-          { error: 'Gagal memperpanjang langganan. Silakan coba lagi.' },
-          { status: 500 }
-        );
-      }
-
+      // Never extend or activate a subscription during checkout.
+      // A verified Mayar payment must trigger the atomic activation separately.
       agentId = existingAgent.id;
     }
 
@@ -605,7 +584,7 @@ export async function POST(req: NextRequest) {
         system_prompt: systemPrompt,
         welcome_message: safeWelcomeMessage,
         custom_agent_slug: slug,
-        payment_status: 'PAID',
+        payment_status: 'PENDING',
         owner_name: name,
         owner_email: email,
         owner_phone: phone,
@@ -614,9 +593,9 @@ export async function POST(req: NextRequest) {
         amount: amount,
         referral_code: referralCodeGenerated,
         referred_by_agent_id: referredByAgentId,
-        period_start: new Date().toISOString(),
-        period_end: new Date(Date.now() + planPeriodDays * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'active',
+        period_start: null,
+        period_end: null,
+        status: 'pending',
       };
 
       console.log('[CHECKOUT] Insert paid agent to Supabase:', JSON.stringify(paidAgentPayload));
@@ -638,194 +617,68 @@ export async function POST(req: NextRequest) {
 
       agentId = paidAgent.id;
 
-      if (isMockMode) {
-        console.log('[CHECKOUT] API Key kosong. Masuk ke mock mode.');
-
-        const { error: transactionError } = await supabaseAdmin
-          .from('transactions')
-          .insert({
-            agent_id: agentId,
-            amount: amount,
-            payment_method: 'mock_ipaymu',
-            payment_status: 'PAID',
-            status: 'PAID',
-            merchant_ref: merchantRef,
-            reference: 'MOCK-' + Date.now(),
-            package_id: planPackageId,
-            customer_name: name,
-            customer_email: email,
-            customer_phone: phone,
-          });
-
-        if (transactionError) {
-          console.error('[CHECKOUT] Mock transaction creation error:', transactionError);
-        }
-
-        transactionId = merchantRef;
-        redirectUrl = '/success?ref=MOCK&slug=' + slug;
-        paymentIsSandbox = true;
-      } else {
-        console.log('[CHECKOUT] API Key terdeteksi. Memanggil iPaymu...');
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || req.headers.get('origin') || 'https://example.com';
-        const returnUrl = buildIpaymuUrl(baseUrl, '/success?ref=ipaymu&slug=' + slug);
-        const notifyUrl = buildIpaymuUrl(baseUrl, '/api/webhooks/ipaymu');
-        const cancelUrl = buildIpaymuUrl(baseUrl, '/');
-
-        let paymentUrl = '';
-        let paymentSandbox = true;
-
-        try {
-          const ipaymu = await createIpaymuPayment({
-            referenceId: merchantRef,
-            productName: agentName,
-            price: amount,
-            buyerName: name,
-            buyerEmail: email,
-            buyerPhone: phone,
-            returnUrl,
-            notifyUrl,
-            cancelUrl,
-          });
-          paymentUrl = ipaymu.url;
-          paymentSandbox = ipaymu.sandbox;
-        } catch (payErr) {
-          console.error('[CHECKOUT] iPaymu payment creation failed:', payErr);
-          const message = payErr instanceof Error ? payErr.message : String(payErr);
-          return NextResponse.json(
-            { error: message },
-            { status: 500 }
-          );
-        }
-
-        const { error: transactionError } = await supabaseAdmin
-          .from('transactions')
-          .insert({
-            agent_id: agentId,
-            amount: amount,
-            payment_method: 'ipaymu',
-            payment_status: 'PENDING',
-            status: 'UNPAID',
-            merchant_ref: merchantRef,
-            reference: '',
-            package_id: planPackageId,
-            customer_name: name,
-            customer_email: email,
-            customer_phone: phone,
-          });
-
-        if (transactionError) {
-          console.error('[CHECKOUT] Transaction creation error:', transactionError);
-        }
-
-        transactionId = merchantRef;
-        redirectUrl = paymentUrl;
-        paymentIsSandbox = paymentSandbox;
+      if (!process.env.MAYAR_API_KEY) {
+        return NextResponse.json({ error: 'Pembayaran belum tersedia. Hubungi administrator.' }, { status: 503 });
       }
+      const invoice = await createMayarInvoice({
+        merchantRef, customerName: name, customerEmail: email, customerPhone: phone,
+        plan: planType === 'yearly' ? 'yearly' : 'monthly',
+        amount, agentId: agentId!, renewal: false,
+      });
+      const { error: transactionError } = await supabaseAdmin.from('transactions').insert({
+        agent_id: agentId,
+        amount,
+        payment_method: 'mayar',
+        payment_status: 'PENDING',
+        status: 'UNPAID',
+        merchant_ref: merchantRef,
+        reference: invoice.transactionId,
+        package_id: planPackageId,
+        customer_name: name,
+        customer_email: email,
+        customer_phone: phone,
+      });
+      if (transactionError) {
+        console.error('[CHECKOUT] Failed to persist Mayar transaction', transactionError);
+        return NextResponse.json({ error: 'Gagal menyimpan transaksi pembayaran.' }, { status: 500 });
+      }
+      transactionId = merchantRef;
+      redirectUrl = invoice.link;
+      paymentIsSandbox = false;
     } else if (isRenewal) {
       const renewalMerchantRef = 'REF-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
 
-      if (isMockMode) {
-        console.log('[CHECKOUT] Renewal mock mode active.');
-
-        const { error: transactionError } = await supabaseAdmin
-          .from('transactions')
-          .insert({
-            agent_id: agentId,
-            amount: amount,
-            payment_method: 'mock_ipaymu',
-            payment_status: 'PAID',
-            status: 'PAID',
-            merchant_ref: renewalMerchantRef,
-            reference: 'MOCK-' + Date.now(),
-            package_id: planPackageId,
-            customer_name: name,
-            customer_email: email,
-            customer_phone: phone,
-          });
-
-        if (transactionError) {
-          console.error('[CHECKOUT] Renewal mock transaction creation error:', transactionError);
-        }
-
-        transactionId = renewalMerchantRef;
-        redirectUrl = '/success?ref=MOCK&slug=' + slug;
-        paymentIsSandbox = true;
-      } else {
-        console.log('[CHECKOUT] Renewal mode. Memanggil iPaymu...');
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || '';
-        const returnUrl = buildIpaymuUrl(baseUrl, '/success?ref=ipaymu&slug=' + slug);
-        const notifyUrl = buildIpaymuUrl(baseUrl, '/api/webhooks/ipaymu');
-        const cancelUrl = buildIpaymuUrl(baseUrl, '/');
-
-        const hasIpaymuVa = !!process.env.IPAYMU_VA;
-        const hasIpaymuKey = !!process.env.IPAYMU_API_KEY || !!process.env.IPAYMU_API_SANDBOX_KEY;
-        const ipaymuMode = process.env.IPAYMU_MODE || 'sandbox';
-        console.log('[CHECKOUT] iPaymu env check:', { hasIpaymuVa, hasIpaymuKey, ipaymuMode, baseUrl });
-
-        let paymentUrl = '';
-        let paymentSandbox = true;
-
-        try {
-          const ipaymu = await createIpaymuPayment({
-            referenceId: renewalMerchantRef,
-            productName: agentName + ' (Perpanjangan)',
-            price: amount,
-            buyerName: name,
-            buyerEmail: email,
-            buyerPhone: phone,
-            returnUrl,
-            notifyUrl,
-            cancelUrl,
-          });
-          paymentUrl = ipaymu.url;
-          paymentSandbox = ipaymu.sandbox;
-        } catch (payErr) {
-          console.error('[CHECKOUT] iPaymu renewal payment creation failed:', payErr);
-          const errorMessage = payErr instanceof Error ? payErr.message : String(payErr);
-          const debugInfo = {
-            message: errorMessage,
-            hasIpaymuVa,
-            hasIpaymuKey,
-            ipaymuMode,
-            baseUrl: baseUrl || '(empty)',
-          };
-          console.error('[CHECKOUT] Renewal debug:', JSON.stringify(debugInfo));
-          return NextResponse.json(
-            {
-              error: 'Gagal membuat link pembayaran perpanjangan: ' + errorMessage,
-              debug: debugInfo,
-            },
-            { status: 500 }
-          );
-        }
-
-        const { error: transactionError } = await supabaseAdmin
-          .from('transactions')
-          .insert({
-            agent_id: agentId,
-            amount: amount,
-            payment_method: 'ipaymu',
-            payment_status: 'PENDING',
-            status: 'UNPAID',
-            merchant_ref: renewalMerchantRef,
-            reference: '',
-            package_id: planPackageId,
-            customer_name: name,
-            customer_email: email,
-            customer_phone: phone,
-          });
-
-        if (transactionError) {
-          console.error('[CHECKOUT] Renewal transaction creation error:', transactionError);
-        }
-
-        transactionId = renewalMerchantRef;
-        redirectUrl = paymentUrl;
-        paymentIsSandbox = paymentSandbox;
+      if (!process.env.MAYAR_API_KEY) {
+        return NextResponse.json({ error: 'Pembayaran belum tersedia. Hubungi administrator.' }, { status: 503 });
       }
+      const invoice = await createMayarInvoice({
+        merchantRef: renewalMerchantRef, customerName: name, customerEmail: email,
+        customerPhone: phone, plan: planType === 'yearly' ? 'yearly' : 'monthly',
+        amount, agentId: agentId!, renewal: true,
+      });
+      const { error: transactionError } = await supabaseAdmin.from('transactions').insert({
+        agent_id: agentId,
+        amount,
+        payment_method: 'mayar',
+        payment_status: 'PENDING',
+        status: 'UNPAID',
+        merchant_ref: renewalMerchantRef,
+        reference: invoice.transactionId,
+        package_id: planPackageId,
+        customer_name: name,
+        customer_email: email,
+        customer_phone: phone,
+      });
+      if (transactionError) {
+        console.error('[CHECKOUT] Failed to persist Mayar renewal', transactionError);
+        return NextResponse.json({ error: 'Gagal menyimpan transaksi perpanjangan.' }, { status: 500 });
+      }
+      transactionId = renewalMerchantRef;
+      redirectUrl = invoice.link;
+      paymentIsSandbox = false;
     }
 
-    const shareUrl = 'http://localhost:3000/chat/' + slug;
+    const shareUrl = 'https://agentsaya.site/chat/' + slug;
 
     return NextResponse.json({
       success: true,
