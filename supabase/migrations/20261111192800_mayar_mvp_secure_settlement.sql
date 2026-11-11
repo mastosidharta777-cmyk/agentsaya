@@ -1,6 +1,7 @@
 -- Apply together with the Mayar checkout release, after backing up DB and verifying env.
 -- Do NOT run before switching server routes to service_role; public read scope changes.
 BEGIN;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS paid_at timestamptz;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS mayar_request_id uuid;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS mayar_initial_transaction_id uuid;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS mayar_settled_transaction_id uuid;
