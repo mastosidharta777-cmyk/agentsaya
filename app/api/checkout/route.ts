@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { BASIC_PLAN, TRIAL_PLAN, YEARLY_PLAN, formatRupiah } from '@/lib/plans';
 import { slugify, randomSuffix, buildSystemPrompt, generateReferralCode } from '@/lib/agents';
-import { createIpaymuPayment } from '@/lib/ipaymu';
-import { buildIpaymuUrl } from '@/lib/ipaymu';
+import { createAgentSayaPayment, requireMayarConfigured, isMayarSandbox } from '@/lib/mayar';
+import { randomUUID } from 'crypto';
 import { extractText } from 'unpdf';
 import { cleanKnowledgeBaseWithLLM } from '@/lib/llm';
 
@@ -15,9 +15,6 @@ const cleanPayloadText = (str: string) => {
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 };
 
-const IPAYMU_API_KEY = process.env.IPAYMU_API_KEY || process.env.IPAYMU_API_SANDBOX_KEY || '';
-const IPAYMU_VA = process.env.IPAYMU_VA || '';
-const isMockMode = !IPAYMU_API_KEY || !IPAYMU_VA;
 
 const TRIAL_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -426,406 +423,119 @@ export async function POST(req: NextRequest) {
     const planPeriodDays = getPlanPeriodDays(planType);
     const planPackageId = getPlanPackageId(planType);
 
+    if (!['trial', 'monthly', 'yearly'].includes(planType) ||
+        (renewal && planType === 'trial')) {
+      return NextResponse.json({ error: 'Paket tidak valid.' }, { status: 400 });
+    }
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json({ error: 'Konfigurasi database server belum siap.' }, { status: 503 });
+    }
+    const isRenewal = renewal && !!slugFromForm;
     let agentId: string | null = null;
-    let transactionId: string | null = null;
     let redirectUrl: string | null = null;
     let paymentIsSandbox = true;
 
-    const isRenewal = renewal && slug;
-
-    if (!isRenewal && planType !== 'trial' && email) {
-      const { data: existingPaidAgent, error: existingError } = await supabaseAdmin
-        .from('agents')
-        .select('id, agent_name, custom_agent_slug, payment_status, period_end, trial_ends_at')
-        .or(`owner_email.eq.${email}${phone ? `,owner_phone.eq.${phone}` : ''}`)
-        .in('payment_status', ['PAID', 'TRIAL'])
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (existingError) {
-        console.error('[CHECKOUT] Duplicate check error:', existingError);
-      }
-
-      if (existingPaidAgent) {
-        const isActive = existingPaidAgent.payment_status === 'PAID'
-          ? existingPaidAgent.period_end && new Date(existingPaidAgent.period_end) > new Date()
-          : existingPaidAgent.trial_ends_at && new Date(existingPaidAgent.trial_ends_at) > new Date();
-
-        if (isActive) {
-          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.agentsaya.site';
-          return NextResponse.json(
-            {
-              error: `Anda sudah memiliki agent aktif (${existingPaidAgent.agent_name}). Setiap akun hanya untuk 1 agent. Silakan perpanjang atau edit knowledge base agent yang sudah ada di dashboard.`,
-              existingAgentSlug: existingPaidAgent.custom_agent_slug,
-              dashboardUrl: `${baseUrl}/dashboard`,
-              upgradeUrl: `${baseUrl}/checkout?slug=${existingPaidAgent.custom_agent_slug}&renewal=true`,
-            },
-            { status: 409 }
-          );
+    if (!isRenewal && planType !== 'trial') {
+      const { data: existing } = await supabaseAdmin
+        .from('agents').select('id,agent_name,custom_agent_slug,payment_status,period_end,trial_ends_at')
+        .eq('owner_email', email.trim().toLowerCase())
+        .in('payment_status', ['PAID', 'TRIAL']).limit(1).maybeSingle();
+      if (existing) {
+        const expiry = existing.payment_status === 'TRIAL' ? existing.trial_ends_at : existing.period_end;
+        if (expiry && new Date(expiry) > new Date()) {
+          return NextResponse.json({
+            error: 'Anda sudah memiliki AI Agent aktif. Silakan gunakan dashboard.',
+            dashboardUrl: '/dashboard',
+            upgradeUrl: '/checkout?slug=' + encodeURIComponent(existing.custom_agent_slug) + '&renewal=true',
+          }, { status: 409 });
         }
       }
     }
 
     if (planType === 'trial' && !isRenewal) {
-      const { data: previousTrial, error: previousError } = await supabaseAdmin
-        .from('agents')
-        .select('id, agent_name, custom_agent_slug, payment_status, trial_ends_at')
-        .or(`owner_email.eq.${email}${phone ? `,owner_phone.eq.${phone}` : ''}`)
-        .eq('payment_status', 'TRIAL')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (previousError) {
-        console.error('[CHECKOUT] Previous trial check error:', previousError);
+      const { data: past } = await supabaseAdmin.from('agents')
+        .select('id,trial_ends_at').eq('owner_email', email.trim().toLowerCase())
+        .eq('plan_tier','trial').limit(1).maybeSingle();
+      if (past) {
+        return NextResponse.json({
+          error: 'Free trial sudah pernah digunakan. Pilih paket berbayar untuk melanjutkan.'
+        }, { status: 409 });
       }
-
-      if (previousTrial) {
-        const trialStillActive = previousTrial.trial_ends_at && new Date(previousTrial.trial_ends_at) > new Date();
-        if (trialStillActive) {
-          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.agentsaya.site';
-          return NextResponse.json(
-            {
-              error: `Anda sudah punya trial aktif (${previousTrial.agent_name}). Silakan gunakan dashboard untuk mengelola agent Anda, atau langsung upgrade ke paket berbayar.`,
-              dashboardUrl: `${baseUrl}/dashboard`,
-              upgradeUrl: `${baseUrl}/checkout?slug=${previousTrial.custom_agent_slug}&renewal=true`,
-            },
-            { status: 409 }
-          );
+      const trialRef = 'TRIAL-' + randomUUID();
+      const { data: agent, error: agentErr } = await supabaseAdmin.from('agents').insert({
+        agent_name: agentName, knowledge_base: safeKnowledgeBaseFinal,
+        system_prompt: systemPrompt, welcome_message: safeWelcomeMessage,
+        custom_agent_slug: slug, payment_status: 'TRIAL',
+        owner_name: name, owner_email: email.trim().toLowerCase(), owner_phone: phone,
+        telegram_chat_id: telegramChatId || null,
+        plan_tier: 'trial', trial_ends_at: new Date(Date.now() + TRIAL_DAYS_MS).toISOString(),
+        referral_code: referralCodeGenerated,
+      }).select('id').single();
+      if (agentErr || !agent) throw new Error('Gagal membuat agent free trial.');
+      agentId = agent.id;
+      const { error: trialTxErr } = await supabaseAdmin.from('transactions').insert({
+        agent_id: agent.id, amount: 0, payment_method: 'free_trial',
+        status: 'PAID', payment_status: 'PAID', merchant_ref: trialRef,
+        package_id: planPackageId, customer_name: name,
+        customer_email: email.trim().toLowerCase(), customer_phone: phone,
+      });
+      if (trialTxErr) console.warn('[TRIAL] optional transaction log failed:', trialTxErr.code);
+      redirectUrl = '/success?ref=trial&slug=' + encodeURIComponent(slug);
+    } else {
+      // Never create a real payment, or change an agent's status, in an unconfigured environment.
+      requireMayarConfigured();
+      const ref = randomUUID();
+      if (isRenewal) {
+        const { data: existing, error: lookupErr } = await supabaseAdmin.from('agents')
+          .select('id,agent_name,owner_email')
+          .eq('custom_agent_slug', slug).maybeSingle();
+        if (lookupErr || !existing) return NextResponse.json({ error: 'Agent tidak ditemukan.' }, { status: 404 });
+        if (String(existing.owner_email || '').trim().toLowerCase() !== email.trim().toLowerCase()) {
+          return NextResponse.json({ error: 'Email pemilik agent tidak cocok.' }, { status: 403 });
         }
-      }
-    }
-
-    if (isRenewal) {
-      console.log('[CHECKOUT] Renewal mode for slug:', slug);
-      const { data: existingAgent, error: existingError } = await supabaseAdmin
-        .from('agents')
-        .select('id, payment_status, period_end, plan_tier')
-        .eq('custom_agent_slug', slug)
-        .maybeSingle();
-
-      console.log('[CHECKOUT] Renewal lookup result:', { existingAgent: !!existingAgent, existingError });
-
-      if (existingError || !existingAgent) {
-        console.error('[CHECKOUT] Renewal agent lookup error:', existingError);
-        return NextResponse.json(
-          { error: 'Agent tidak ditemukan untuk perpanjangan.' },
-          { status: 404 }
-        );
-      }
-
-      const newPeriodEnd = computeNewPeriodEnd(existingAgent.period_end, planPeriodDays);
-
-      const { error: updateError } = await supabaseAdmin
-        .from('agents')
-        .update({
-          payment_status: 'PAID',
-          period_end: newPeriodEnd,
+        agentId = existing.id;
+        agentName = existing.agent_name;
+      } else {
+        const { data: agent, error: agentErr } = await supabaseAdmin.from('agents').insert({
+          agent_name: agentName, knowledge_base: safeKnowledgeBaseFinal,
+          system_prompt: systemPrompt, welcome_message: safeWelcomeMessage,
+          custom_agent_slug: slug, payment_status: 'PENDING',
+          owner_name: name, owner_email: email.trim().toLowerCase(), owner_phone: phone,
+          telegram_chat_id: telegramChatId || null,
           plan_tier: planType === 'yearly' ? 'yearly' : 'basic',
+          amount, referral_code: referralCodeGenerated,
+          referred_by_agent_id: referredByAgentId,
+        }).select('id').single();
+        if (agentErr || !agent) throw new Error('Gagal menyiapkan AI Agent.');
+        agentId = agent.id;
+      }
+      const { data: tx, error: txErr } = await supabaseAdmin.from('transactions').insert({
+        agent_id: agentId, amount, status: 'UNPAID', payment_status: 'PENDING',
+        payment_method: 'mayar', merchant_ref: ref, package_id: planPackageId,
+        customer_name: name, customer_email: email.trim().toLowerCase(),
+        customer_phone: phone,
+      }).select('id').single();
+      if (txErr || !tx) throw new Error('Gagal mencatat pesanan; tidak ada pembayaran dibuat.');
+      const request = await createAgentSayaPayment({
+        orderId: tx.id, plan: planType as 'monthly' | 'yearly',
+        amount, email: email.trim().toLowerCase(), phone,
+      });
+      const { data: bound, error: bindErr } = await supabaseAdmin.from('transactions')
+        .update({
+          mayar_request_id: request.requestId,
+          mayar_initial_transaction_id: request.initialTransactionId,
+          mayar_checkout_url: request.checkoutUrl,
         })
-        .eq('id', existingAgent.id);
-
-      if (updateError) {
-        console.error('[CHECKOUT] Renewal agent update error:', updateError);
-        return NextResponse.json(
-          { error: 'Gagal memperpanjang langganan. Silakan coba lagi.' },
-          { status: 500 }
-        );
+        .eq('id', tx.id).eq('status', 'UNPAID').select('id').single();
+      if (bindErr || !bound) {
+        throw new Error('Pesanan Mayar tidak dapat diverifikasi. Jangan lakukan pembayaran.');
       }
-
-      agentId = existingAgent.id;
+      // Keep AgentSaya open so the customer can watch the paid status in a second tab.
+      redirectUrl = '/payment?ref=' + encodeURIComponent(ref);
+      paymentIsSandbox = isMayarSandbox();
     }
 
-    if (planType === 'trial' && !isRenewal) {
-      const trialMerchantRef = 'REF-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
-
-      const trialPayload = {
-        agent_name: agentName,
-        knowledge_base: safeKnowledgeBaseFinal,
-        system_prompt: systemPrompt,
-        welcome_message: safeWelcomeMessage,
-        custom_agent_slug: slug,
-        payment_status: 'TRIAL',
-        owner_name: name,
-        owner_email: email,
-        owner_phone: phone,
-        telegram_chat_id: telegramChatId || null,
-        plan_tier: 'trial',
-        trial_ends_at: new Date(Date.now() + TRIAL_DAYS_MS).toISOString(),
-        referral_code: referralCodeGenerated,
-      };
-
-      const { data: trialAgent, error: trialError } = await supabaseAdmin
-        .from('agents')
-        .insert(trialPayload)
-        .select('id')
-        .single();
-
-      if (trialError || !trialAgent) {
-        console.error('[CHECKOUT] Trial agent creation error:', trialError);
-        const detail = trialError?.message || JSON.stringify(trialError) || 'Unknown error';
-        return NextResponse.json(
-          { error: 'Gagal membuat agent trial: ' + detail },
-          { status: 500 }
-        );
-      }
-
-      agentId = trialAgent.id;
-
-      const { error: transactionError } = await supabaseAdmin
-        .from('transactions')
-        .insert({
-          agent_id: agentId,
-          amount: 0,
-          payment_method: 'free_trial',
-          payment_status: 'PAID',
-          status: 'PAID',
-          merchant_ref: trialMerchantRef,
-          reference: 'TRIAL-' + Date.now(),
-          package_id: planPackageId,
-          customer_name: name,
-          customer_email: email,
-          customer_phone: phone,
-        });
-
-      if (transactionError) {
-        console.error('[CHECKOUT] Trial transaction creation error:', transactionError);
-      }
-
-      transactionId = trialMerchantRef;
-      redirectUrl = '/success?ref=trial&slug=' + slug;
-      paymentIsSandbox = true;
-    } else if (!isRenewal) {
-      const merchantRef = 'REF-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
-
-      const paidAgentPayload = {
-        agent_name: agentName,
-        knowledge_base: safeKnowledgeBaseFinal,
-        system_prompt: systemPrompt,
-        welcome_message: safeWelcomeMessage,
-        custom_agent_slug: slug,
-        payment_status: 'PAID',
-        owner_name: name,
-        owner_email: email,
-        owner_phone: phone,
-        telegram_chat_id: telegramChatId || null,
-        plan_tier: planType === 'yearly' ? 'yearly' : 'basic',
-        amount: amount,
-        referral_code: referralCodeGenerated,
-        referred_by_agent_id: referredByAgentId,
-        period_start: new Date().toISOString(),
-        period_end: new Date(Date.now() + planPeriodDays * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'active',
-      };
-
-      console.log('[CHECKOUT] Insert paid agent to Supabase:', JSON.stringify(paidAgentPayload));
-
-      const { data: paidAgent, error: paidError } = await supabaseAdmin
-        .from('agents')
-        .insert(paidAgentPayload)
-        .select('id')
-        .single();
-
-      if (paidError || !paidAgent) {
-        console.error('[CHECKOUT] Paid agent creation error:', paidError);
-        const detail = paidError?.message || JSON.stringify(paidError) || 'Unknown error';
-        return NextResponse.json(
-          { error: 'Gagal membuat agent: ' + detail },
-          { status: 500 }
-        );
-      }
-
-      agentId = paidAgent.id;
-
-      if (isMockMode) {
-        console.log('[CHECKOUT] API Key kosong. Masuk ke mock mode.');
-
-        const { error: transactionError } = await supabaseAdmin
-          .from('transactions')
-          .insert({
-            agent_id: agentId,
-            amount: amount,
-            payment_method: 'mock_ipaymu',
-            payment_status: 'PAID',
-            status: 'PAID',
-            merchant_ref: merchantRef,
-            reference: 'MOCK-' + Date.now(),
-            package_id: planPackageId,
-            customer_name: name,
-            customer_email: email,
-            customer_phone: phone,
-          });
-
-        if (transactionError) {
-          console.error('[CHECKOUT] Mock transaction creation error:', transactionError);
-        }
-
-        transactionId = merchantRef;
-        redirectUrl = '/success?ref=MOCK&slug=' + slug;
-        paymentIsSandbox = true;
-      } else {
-        console.log('[CHECKOUT] API Key terdeteksi. Memanggil iPaymu...');
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || req.headers.get('origin') || 'https://example.com';
-        const returnUrl = buildIpaymuUrl(baseUrl, '/success?ref=ipaymu&slug=' + slug);
-        const notifyUrl = buildIpaymuUrl(baseUrl, '/api/webhooks/ipaymu');
-        const cancelUrl = buildIpaymuUrl(baseUrl, '/');
-
-        let paymentUrl = '';
-        let paymentSandbox = true;
-
-        try {
-          const ipaymu = await createIpaymuPayment({
-            referenceId: merchantRef,
-            productName: agentName,
-            price: amount,
-            buyerName: name,
-            buyerEmail: email,
-            buyerPhone: phone,
-            returnUrl,
-            notifyUrl,
-            cancelUrl,
-          });
-          paymentUrl = ipaymu.url;
-          paymentSandbox = ipaymu.sandbox;
-        } catch (payErr) {
-          console.error('[CHECKOUT] iPaymu payment creation failed:', payErr);
-          const message = payErr instanceof Error ? payErr.message : String(payErr);
-          return NextResponse.json(
-            { error: message },
-            { status: 500 }
-          );
-        }
-
-        const { error: transactionError } = await supabaseAdmin
-          .from('transactions')
-          .insert({
-            agent_id: agentId,
-            amount: amount,
-            payment_method: 'ipaymu',
-            payment_status: 'PENDING',
-            status: 'UNPAID',
-            merchant_ref: merchantRef,
-            reference: '',
-            package_id: planPackageId,
-            customer_name: name,
-            customer_email: email,
-            customer_phone: phone,
-          });
-
-        if (transactionError) {
-          console.error('[CHECKOUT] Transaction creation error:', transactionError);
-        }
-
-        transactionId = merchantRef;
-        redirectUrl = paymentUrl;
-        paymentIsSandbox = paymentSandbox;
-      }
-    } else if (isRenewal) {
-      const renewalMerchantRef = 'REF-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
-
-      if (isMockMode) {
-        console.log('[CHECKOUT] Renewal mock mode active.');
-
-        const { error: transactionError } = await supabaseAdmin
-          .from('transactions')
-          .insert({
-            agent_id: agentId,
-            amount: amount,
-            payment_method: 'mock_ipaymu',
-            payment_status: 'PAID',
-            status: 'PAID',
-            merchant_ref: renewalMerchantRef,
-            reference: 'MOCK-' + Date.now(),
-            package_id: planPackageId,
-            customer_name: name,
-            customer_email: email,
-            customer_phone: phone,
-          });
-
-        if (transactionError) {
-          console.error('[CHECKOUT] Renewal mock transaction creation error:', transactionError);
-        }
-
-        transactionId = renewalMerchantRef;
-        redirectUrl = '/success?ref=MOCK&slug=' + slug;
-        paymentIsSandbox = true;
-      } else {
-        console.log('[CHECKOUT] Renewal mode. Memanggil iPaymu...');
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || '';
-        const returnUrl = buildIpaymuUrl(baseUrl, '/success?ref=ipaymu&slug=' + slug);
-        const notifyUrl = buildIpaymuUrl(baseUrl, '/api/webhooks/ipaymu');
-        const cancelUrl = buildIpaymuUrl(baseUrl, '/');
-
-        const hasIpaymuVa = !!process.env.IPAYMU_VA;
-        const hasIpaymuKey = !!process.env.IPAYMU_API_KEY || !!process.env.IPAYMU_API_SANDBOX_KEY;
-        const ipaymuMode = process.env.IPAYMU_MODE || 'sandbox';
-        console.log('[CHECKOUT] iPaymu env check:', { hasIpaymuVa, hasIpaymuKey, ipaymuMode, baseUrl });
-
-        let paymentUrl = '';
-        let paymentSandbox = true;
-
-        try {
-          const ipaymu = await createIpaymuPayment({
-            referenceId: renewalMerchantRef,
-            productName: agentName + ' (Perpanjangan)',
-            price: amount,
-            buyerName: name,
-            buyerEmail: email,
-            buyerPhone: phone,
-            returnUrl,
-            notifyUrl,
-            cancelUrl,
-          });
-          paymentUrl = ipaymu.url;
-          paymentSandbox = ipaymu.sandbox;
-        } catch (payErr) {
-          console.error('[CHECKOUT] iPaymu renewal payment creation failed:', payErr);
-          const errorMessage = payErr instanceof Error ? payErr.message : String(payErr);
-          const debugInfo = {
-            message: errorMessage,
-            hasIpaymuVa,
-            hasIpaymuKey,
-            ipaymuMode,
-            baseUrl: baseUrl || '(empty)',
-          };
-          console.error('[CHECKOUT] Renewal debug:', JSON.stringify(debugInfo));
-          return NextResponse.json(
-            {
-              error: 'Gagal membuat link pembayaran perpanjangan: ' + errorMessage,
-              debug: debugInfo,
-            },
-            { status: 500 }
-          );
-        }
-
-        const { error: transactionError } = await supabaseAdmin
-          .from('transactions')
-          .insert({
-            agent_id: agentId,
-            amount: amount,
-            payment_method: 'ipaymu',
-            payment_status: 'PENDING',
-            status: 'UNPAID',
-            merchant_ref: renewalMerchantRef,
-            reference: '',
-            package_id: planPackageId,
-            customer_name: name,
-            customer_email: email,
-            customer_phone: phone,
-          });
-
-        if (transactionError) {
-          console.error('[CHECKOUT] Renewal transaction creation error:', transactionError);
-        }
-
-        transactionId = renewalMerchantRef;
-        redirectUrl = paymentUrl;
-        paymentIsSandbox = paymentSandbox;
-      }
-    }
-
-    const shareUrl = 'http://localhost:3000/chat/' + slug;
+    const shareUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://www.agentsaya.site') + '/chat/' + slug;
 
     return NextResponse.json({
       success: true,
