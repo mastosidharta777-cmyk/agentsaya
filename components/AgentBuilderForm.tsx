@@ -9,21 +9,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { BASIC_PLAN, TRIAL_PLAN, YEARLY_PLAN, formatRupiah } from '@/lib/plans';
-import { QrisDialog } from './QrisDialog';
-
-interface CheckoutPayload {
-  transactionId: string;
-  agentId?: string;
-  merchantRef: string;
-  reference: string;
-  slug: string;
-  qrisString: string;
-  qrImageUrl?: string;
-  amount: number;
-  amountFormatted: string;
-  agentName: string;
-  sandbox: boolean;
-}
 
 const DEFAULT_WELCOME = (agentName: string) =>
   `Halo! Saya Asisten Virtual (${agentName || 'AI'}). Ada yang bisa saya bantu hari ini?`;
@@ -38,8 +23,6 @@ export function AgentBuilderForm() {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [payload, setPayload] = useState<CheckoutPayload | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [additionalNotes, setAdditionalNotes] = useState('');
   const [extractedText, setExtractedText] = useState('');
@@ -57,26 +40,6 @@ export function AgentBuilderForm() {
       setReferralCode(ref);
     }
   }, [searchParams]);
-
-  // Reset form when dialog closes (successful payment)
-  useEffect(() => {
-    if (!dialogOpen && payload) {
-      setAgentName('');
-      setKnowledgeBase('');
-      setWelcomeMessage('');
-      setName('');
-      setEmail('');
-      setPhone('');
-      setUploadedFiles([]);
-      setAdditionalNotes('');
-      setExtractedText('');
-      setSelectedPdfFile(null);
-      setError(null);
-      setSubmitAttempted(false);
-      setConflictDashboardUrl(null);
-      setConflictUpgradeUrl(null);
-    }
-  }, [dialogOpen, payload]);
 
   async function extractTextFromFile(file: File): Promise<string> {
     const extension = file.name.split('.').pop()?.toLowerCase();
@@ -330,14 +293,8 @@ export function AgentBuilderForm() {
         });
         
         if (!res.ok) {
-          const errorText = await res.text();
-          console.error('Checkout API error:', errorText);
-          try {
-            const errorData = JSON.parse(errorText);
-            throw new Error(errorData.error || 'Gagal membuat pembayaran');
-          } catch {
-            throw new Error('Gagal membuat pembayaran');
-          }
+          const errorData = await res.json().catch(() => null);
+          throw new Error(errorData?.error || 'Gagal membuat pembayaran');
         }
         
         const data = await res.json();
@@ -345,15 +302,12 @@ export function AgentBuilderForm() {
           throw new Error(data.error || 'Gagal membuat pembayaran');
         }
 
-        // iPaymu returns a redirect Payment URL — send the user straight to it.
-        if (data.paymentUrl) {
-          window.location.href = data.paymentUrl;
-          return;
+        // AgentSaya payment status remains open while Mayar is paid in a new tab.
+        if (!data.paymentUrl || !data.paymentUrl.startsWith('/payment?ref=')) {
+          throw new Error('Link pembayaran Mayar tidak tersedia. Jangan melakukan transfer.');
         }
-
-        // Fallback to QRIS modal if no redirect URL is provided.
-        setPayload(data);
-        setDialogOpen(true);
+        window.location.href = data.paymentUrl;
+        return;
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -753,11 +707,7 @@ export function AgentBuilderForm() {
         </Card>
       </div>
 
-      <QrisDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        payload={payload}
-      />
+
     </div>
   );
 }
