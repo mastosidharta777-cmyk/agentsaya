@@ -31,6 +31,9 @@ export function CheckoutForm({
   isRenewal,
   preselectedPlan,
 }: CheckoutFormProps) {
+  const [buyerName, setBuyerName] = useState(ownerName);
+  const [buyerEmail, setBuyerEmail] = useState(ownerEmail);
+  const [buyerPhone, setBuyerPhone] = useState(ownerPhone);
   const [selectedPlan, setSelectedPlan] = useState<PlanType>(
     preselectedPlan === 'yearly' ? 'yearly' : 'monthly'
   );
@@ -41,6 +44,10 @@ export function CheckoutForm({
 
   const handlePay = async () => {
     setError(null);
+    if (!buyerName.trim() || !buyerEmail.trim() || !buyerPhone.trim()) {
+      setError('Lengkapi nama, email pemilik agen, dan nomor WhatsApp.');
+      return;
+    }
     setLoading(true);
 
     try {
@@ -48,9 +55,9 @@ export function CheckoutForm({
       formData.append('agentName', agentName);
       formData.append('knowledgeBase', knowledgeBase);
       formData.append('welcomeMessage', welcomeMessage);
-      formData.append('name', ownerName);
-      formData.append('email', ownerEmail);
-      formData.append('phone', ownerPhone);
+      formData.append('name', buyerName.trim());
+      formData.append('email', buyerEmail.trim());
+      formData.append('phone', buyerPhone.trim());
       formData.append('planType', selectedPlan);
       formData.append('slug', slug);
       formData.append('renewal', isRenewal ? 'true' : 'false');
@@ -76,8 +83,8 @@ export function CheckoutForm({
       }
 
       const data = await res.json();
-      if (data.redirectUrl) {
-        window.location.href = data.redirectUrl;
+      if (data.paymentUrl) {
+        window.location.href = data.paymentUrl;
       } else {
         setError('Tidak ada URL pembayaran yang dikembalikan');
       }
@@ -96,6 +103,21 @@ export function CheckoutForm({
           <p className="text-muted-foreground mt-1">
             Agent: <strong>{agentName}</strong>
           </p>
+        </div>
+
+        <div className="grid gap-3 rounded-xl border p-4">
+          <label className="text-sm font-medium">Nama pemilik
+            <input value={buyerName} onChange={e => setBuyerName(e.target.value)} required
+              className="mt-1 w-full rounded-lg border bg-background p-2" autoComplete="name" />
+          </label>
+          <label className="text-sm font-medium">Email terdaftar
+            <input type="email" value={buyerEmail} onChange={e => setBuyerEmail(e.target.value)} required
+              className="mt-1 w-full rounded-lg border bg-background p-2" autoComplete="email" />
+          </label>
+          <label className="text-sm font-medium">WhatsApp
+            <input type="tel" value={buyerPhone} onChange={e => setBuyerPhone(e.target.value)} required
+              className="mt-1 w-full rounded-lg border bg-background p-2" autoComplete="tel" />
+          </label>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
