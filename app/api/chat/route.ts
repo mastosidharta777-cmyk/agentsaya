@@ -3,7 +3,7 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase';
 import { chatComplete, type ChatTurn } from '@/lib/llm';
 import { sendTelegramMessageToChat } from '@/lib/telegram';
 import { sendEmail } from '@/lib/email';
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       history?: ChatTurn[];
     };
 
-    if (!slug || !message) {
+    if (typeof slug !== 'string' || !slug || typeof message !== 'string' || !message) {
       return NextResponse.json(
         { error: 'slug and message are required.' },
         { status: 400 }
@@ -41,7 +41,6 @@ export async function POST(req: NextRequest) {
 
     console.log('=== CHAT API ===');
     console.log('Slug:', slug);
-    console.log('Message:', message);
 
     // First, try to get agent directly to check if it exists and its status
     const { data: directAgent, error: directError } = await supabaseAdmin
@@ -52,7 +51,6 @@ export async function POST(req: NextRequest) {
       .limit(1)
       .maybeSingle();
 
-    console.log('Direct agent query result:', directAgent);
     console.log('Direct agent error:', directError);
 
     if (directError) {
@@ -64,44 +62,17 @@ export async function POST(req: NextRequest) {
     }
 
     if (!directAgent) {
-      console.log('Agent not found in database for slug:', slug);
-      // Try to find any agent to see if database is working
-      const { data: anyAgent, error: anyError } = await supabaseAdmin
-        .from('agents')
-        .select('custom_agent_slug, agent_name')
-        .limit(5);
-      
-      console.log('Available agents for debugging:', anyAgent);
-      console.log('Any agent query error:', anyError);
-      
-      return NextResponse.json(
-        { 
-          error: 'Agent tidak ditemukan. Silakan periksa URL atau buat agent baru.',
-          debug: {
-            requestedSlug: slug,
-            availableAgents: anyAgent?.map(a => a.custom_agent_slug) || []
-          }
-        },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Agent tidak ditemukan.' }, { status: 404 });
     }
-
-    console.log('Agent payment status:', directAgent.payment_status);
-
-    // Check if agent is pending (just created, not paid yet)
-    if (directAgent.payment_status === 'PENDING') {
-      console.log('Agent is PENDING, waiting for payment');
-      return NextResponse.json(
-        { error: 'Agent masih menunggu pembayaran. Silakan selesaikan pembayaran terlebih dahulu.' },
-        { status: 403 }
-      );
+    if (!['TRIAL','PAID'].includes(directAgent.payment_status)) {
+      return NextResponse.json({ error: 'Agent tidak aktif. Silakan perpanjang langganan.' }, { status: 403 });
     }
 
     // Check if trial is expired
     if (directAgent.payment_status === 'TRIAL') {
       const trialExpired = directAgent.trial_ends_at 
-        ? new Date(directAgent.trial_ends_at) < new Date() 
-        : false;
+        ? !(new Date(directAgent.trial_ends_at) > new Date())
+        : true;
 
       console.log('Trial expired check:', trialExpired, 'Trial ends at:', directAgent.trial_ends_at);
 
@@ -124,8 +95,8 @@ export async function POST(req: NextRequest) {
     // Check if paid subscription is expired
     if (directAgent.payment_status === 'PAID') {
       const subscriptionExpired = directAgent.period_end 
-        ? new Date(directAgent.period_end) < new Date() 
-        : false;
+        ? !(new Date(directAgent.period_end) > new Date())
+        : true;
 
       console.log('Subscription expired check:', subscriptionExpired, 'Period ends at:', directAgent.period_end);
 
@@ -146,10 +117,7 @@ export async function POST(req: NextRequest) {
     console.log('Agent is valid, using direct data for chat');
     console.log('Agent name:', directAgent.agent_name);
     console.log('Knowledge base length:', directAgent.knowledge_base?.length || 0);
-    console.log('Knowledge base preview:', (directAgent.knowledge_base || '').substring(0, 500));
     console.log('System prompt length:', directAgent.system_prompt?.length || 0);
-    console.log('System prompt preview:', (directAgent.system_prompt || '').substring(0, 500));
-    console.log('User message:', message);
     
 
     let result;
@@ -168,8 +136,6 @@ export async function POST(req: NextRequest) {
       };
     }
 
-    console.log('Chat complete result:', result);
-    console.log('Chat reply:', result.reply);
     console.log('Chat sandbox:', result.sandbox);
 
     try {
