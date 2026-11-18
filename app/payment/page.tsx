@@ -45,7 +45,7 @@ function PaymentStatus() {
             Mode sandbox. Pembayaran percobaan tidak mengaktifkan langganan sungguhan.
           </p>
         )}
-        {order?.checkoutUrl && (
+        {order?.checkoutUrl && !['SANDBOX_PAID','SANDBOX_EXPIRED'].includes(order.status) && (
           <a href={order.checkoutUrl} target="_blank" rel="noopener noreferrer"
             className="inline-flex w-full justify-center rounded-lg bg-primary px-5 py-3 text-primary-foreground font-semibold">
             Buka halaman pembayaran Mayar
@@ -57,6 +57,8 @@ function PaymentStatus() {
         </p>
         <p className="text-sm">{checking ? 'Mengambil status...' :
           order?.status === 'PAID' ? 'Pembayaran berhasil. Membuka AI Agent...' :
+          order?.status === 'SANDBOX_PAID' ? 'Pembayaran sandbox terverifikasi. Tidak ada aktivasi langganan sungguhan.' :
+          order?.status === 'SANDBOX_EXPIRED' ? 'Pesanan sandbox kedaluwarsa.' :
           'Menunggu konfirmasi pembayaran.'}</p>
         {error && <p className="text-sm text-destructive">{error}</p>}
         <a className="text-sm text-primary underline" href="/dashboard">Ke dashboard</a>

@@ -130,3 +130,22 @@ export async function verifyAgentSayaSettlement(input: {
   }
   return null; // Request paid is not enough without verified settled transaction.
 }
+
+/** Sandbox request confirmation only. Never calls the activation RPC. */
+export async function readSandboxPaymentStatus(input: {
+  orderId: string; requestId: string; plan: 'monthly' | 'yearly'; amount: number;
+}): Promise<'SANDBOX_PAID' | 'SANDBOX_PENDING' | 'SANDBOX_EXPIRED'> {
+  if (!isMayarSandbox() || !uuid(input.orderId) || !uuid(input.requestId) ||
+      input.amount !== (input.plan === 'yearly' ? 399000 : 49000)) {
+    throw new Error('Invalid sandbox order.');
+  }
+  const detail = await mayar('/payments/' + encodeURIComponent(input.requestId));
+  if (detail.id !== input.requestId || detail.type !== 'payment_request' ||
+      amountValue(detail.amount) !== input.amount ||
+      detail.description !== mayarDescription(input.orderId, input.plan)) {
+    throw new Error('Sandbox request mismatch.');
+  }
+  if (detail.status === 'paid') return 'SANDBOX_PAID';
+  if (detail.status === 'expired' || detail.status === 'closed') return 'SANDBOX_EXPIRED';
+  return 'SANDBOX_PENDING';
+}

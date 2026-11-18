@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { isMayarSandbox, isMayarLive, verifyAgentSayaSettlement } from '@/lib/mayar';
+import { isMayarSandbox, isMayarLive, verifyAgentSayaSettlement, readSandboxPaymentStatus } from '@/lib/mayar';
 import { sendWhatsApp, buildAgentWelcomeMessage } from '@/lib/whatsapp';
 import { sendEmail, buildAgentWelcomeEmail } from '@/lib/email';
 import { buildEmbedCode } from '@/lib/agents';
@@ -17,10 +17,14 @@ export async function GET(req: NextRequest) {
   try {
     const { data: tx, error: txError } = await supabaseAdmin.from('transactions')
       .select('id,agent_id,merchant_ref,status,amount,package_id,payment_method,customer_email,mayar_request_id,mayar_initial_transaction_id,mayar_checkout_url')
-      .eq('merchant_ref', ref).eq('payment_method','mayar').maybeSingle();
+      .eq('merchant_ref', ref).eq('payment_method', isMayarSandbox() ? 'mayar_sandbox' : 'mayar').maybeSingle();
     if (txError) return respond({ error: 'Database tidak tersedia' }, 503);
     if (!tx) return respond({ error: 'Transaksi tidak ditemukan' }, 404);
     let status = tx.status;
+    if (isMayarSandbox() && tx.mayar_request_id) {
+      status = await readSandboxPaymentStatus({ orderId: tx.id, requestId: tx.mayar_request_id,
+        plan: tx.package_id === 'yearly' ? 'yearly' : 'monthly', amount: Number(tx.amount) });
+    }
     if (status !== 'PAID' && isMayarLive() && tx.mayar_request_id && tx.mayar_initial_transaction_id) {
       const plan = tx.package_id === 'yearly' ? 'yearly' : 'monthly';
       const settledId = await verifyAgentSayaSettlement({
@@ -67,7 +71,7 @@ export async function GET(req: NextRequest) {
       .eq('id',tx.agent_id).maybeSingle();
     return respond({
       merchantRef: ref,
-      status: status === 'PAID' ? 'PAID' : (isMayarSandbox() ? 'SANDBOX' : 'UNPAID'),
+      status: isMayarSandbox() ? (status.startsWith('SANDBOX_') ? status : 'SANDBOX_PENDING') : (status === 'PAID' ? 'PAID' : 'UNPAID'),
       slug: agent?.custom_agent_slug || null,
       agentName: agent?.agent_name || null,
       paymentStatus: agent?.payment_status || null,

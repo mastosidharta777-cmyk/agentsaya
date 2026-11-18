@@ -511,7 +511,7 @@ export async function POST(req: NextRequest) {
       }
       const { data: tx, error: txErr } = await supabaseAdmin.from('transactions').insert({
         agent_id: agentId, amount, status: 'UNPAID', payment_status: 'PENDING',
-        payment_method: 'mayar', merchant_ref: ref, package_id: planPackageId,
+        payment_method: isMayarSandbox() ? 'mayar_sandbox' : 'mayar', merchant_ref: ref, package_id: planPackageId,
         customer_name: name, customer_email: email.trim().toLowerCase(),
         customer_phone: phone,
       }).select('id').single();

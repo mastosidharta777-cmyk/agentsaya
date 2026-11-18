@@ -11,7 +11,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS transactions_mayar_request_unique
 CREATE UNIQUE INDEX IF NOT EXISTS transactions_mayar_settled_unique
   ON public.transactions(mayar_settled_transaction_id) WHERE mayar_settled_transaction_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS transactions_mayar_order_unique
-  ON public.transactions(merchant_ref) WHERE payment_method = 'mayar';
+  ON public.transactions(merchant_ref) WHERE payment_method IN ('mayar','mayar_sandbox');
 -- Only the trusted server using service_role may finalize a provider-verified settlement.
 CREATE OR REPLACE FUNCTION public.finalize_mayar_agent_payment(
   p_order_id uuid, p_request_id uuid, p_settled_transaction_id uuid,
@@ -103,6 +103,31 @@ USING (
   OR (payment_status='TRIAL' AND trial_ends_at > now())
 );
 REVOKE ALL ON public.agents, public.transactions, public.leads FROM PUBLIC,anon,authenticated;
+-- Revoke any legacy column-specific grants, not only table-level ACLs.
+DO $
+DECLARE t text; cols text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['agents','transactions','leads'] LOOP
+    SELECT string_agg(quote_ident(column_name), ',') INTO cols
+      FROM information_schema.columns WHERE table_schema='public' AND table_name=t;
+    EXECUTE format('REVOKE ALL PRIVILEGES (%s) ON TABLE public.%I FROM PUBLIC,anon,authenticated', cols, t);
+  END LOOP;
+END $;
+-- Older installations use visitor_name/contact_info/interest_summary.
+ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS customer_name text;
+ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS customer_phone text;
+ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS message_summary text;
+ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS source text DEFAULT 'chat';
+DO $
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='leads' AND column_name='contact_info') THEN
+    EXECUTE 'ALTER TABLE public.leads ALTER COLUMN contact_info DROP NOT NULL';
+    EXECUTE 'UPDATE public.leads SET customer_name=COALESCE(customer_name,visitor_name), customer_phone=COALESCE(customer_phone,contact_info), message_summary=COALESCE(message_summary,interest_summary)';
+  END IF;
+END $;
+REVOKE ALL ON FUNCTION public.count_referrals(uuid) FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.get_referral_stats(uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.expire_trial() TO service_role;
 GRANT SELECT (agent_name,welcome_message,custom_agent_slug)
   ON public.agents TO anon,authenticated;
 -- Explicit service_role permissions remain as configured by Supabase.
