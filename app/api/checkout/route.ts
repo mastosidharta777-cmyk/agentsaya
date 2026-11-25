@@ -76,7 +76,6 @@ async function ocrSpaceText(data: Uint8Array, mimeType: string): Promise<string>
     }
 
     const raw = await res.text();
-    console.log('[OCR] OCR.space raw response:', raw.substring(0, 500));
 
     let json: any;
     try {
@@ -200,7 +199,6 @@ export async function POST(req: NextRequest) {
               };
 
               console.log('[CHECKOUT OPENROUTER] POST https://openrouter.ai/api/v1/chat/completions');
-              console.log('[CHECKOUT OPENROUTER] Vision payload:', JSON.stringify(visionPayload).substring(0, 500));
 
               const visionResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method: 'POST',
@@ -216,7 +214,6 @@ export async function POST(req: NextRequest) {
               const visionResult = await visionResponse.json();
 
               if (!visionResponse.ok) {
-                console.error('[CHECKOUT OPENROUTER ERROR RESPONSE]:', JSON.stringify(visionResult));
                 throw new Error(visionResult.error?.message || 'Gagal memproses file via OpenRouter API');
               }
 
@@ -261,7 +258,6 @@ export async function POST(req: NextRequest) {
                 };
 
                 console.log('[CHECKOUT OPENROUTER] POST https://openrouter.ai/api/v1/chat/completions');
-                console.log('[CHECKOUT OPENROUTER] PDF cleaning payload:', JSON.stringify(completionPayload).substring(0, 500));
 
                 const completionResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                   method: 'POST',
@@ -277,7 +273,6 @@ export async function POST(req: NextRequest) {
                 const completionResult = await completionResponse.json();
 
                 if (!completionResponse.ok) {
-                  console.error('[CHECKOUT OPENROUTER TEXT CLEAN ERROR RESPONSE]:', JSON.stringify(completionResult));
                   throw new Error(completionResult.error?.message || 'Gagal memproses teks PDF via OpenRouter API');
                 }
 
