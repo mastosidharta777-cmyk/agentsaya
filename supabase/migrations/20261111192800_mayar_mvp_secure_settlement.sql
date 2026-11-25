@@ -110,7 +110,10 @@ BEGIN
   FOREACH t IN ARRAY ARRAY['agents','transactions','leads'] LOOP
     SELECT string_agg(quote_ident(column_name), ',') INTO cols
       FROM information_schema.columns WHERE table_schema='public' AND table_name=t;
-    EXECUTE format('REVOKE ALL PRIVILEGES (%s) ON TABLE public.%I FROM PUBLIC,anon,authenticated', cols, t);
+    EXECUTE format(
+      'REVOKE SELECT (%s), INSERT (%s), UPDATE (%s), REFERENCES (%s) ON TABLE public.%I FROM PUBLIC,anon,authenticated',
+      cols, cols, cols, cols, t
+    );
   END LOOP;
 END $;
 -- Older installations use visitor_name/contact_info/interest_summary.
@@ -127,6 +130,7 @@ BEGIN
 END $;
 REVOKE ALL ON FUNCTION public.count_referrals(uuid) FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.get_referral_stats(uuid) FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.rls_auto_enable() FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.expire_trial() TO service_role;
 GRANT SELECT (agent_name,welcome_message,custom_agent_slug)
   ON public.agents TO anon,authenticated;

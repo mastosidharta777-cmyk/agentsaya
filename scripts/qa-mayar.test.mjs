@@ -73,3 +73,23 @@ test('untrusted checkout link rejected', async () => {
   mock(url => url.endsWith('/create') ? { id: requestId, transactionId, link: 'https://example.com/pl/abcdef' } : detail);
   await assert.rejects(createAgentSayaPayment({ orderId, plan: 'monthly', amount: 49000, email: input.email, phone: '' }));
 });
+
+// Static safety guardrails for the DB migration and recovery gate.
+import { readFileSync } from 'node:fs';
+test('database migration revokes public payment activation and owner data access', () => {
+  const migration = readFileSync('supabase/migrations/20261111192800_mayar_mvp_secure_settlement.sql', 'utf8');
+  assert.match(migration, /REVOKE ALL ON FUNCTION public\.activate_agent/);
+  assert.match(migration, /REVOKE SELECT \(%s\), INSERT \(%s\), UPDATE \(%s\), REFERENCES \(%s\)/);
+  assert.match(migration, /REVOKE ALL ON FUNCTION public\.finalize_mayar_agent_payment/);
+  assert.match(migration, /CREATE POLICY "public_chat_read"/);
+});
+test('payment recovery is authenticated, bounded and cannot settle sandbox', () => {
+  const source = readFileSync('lib/mayar-recovery.ts', 'utf8');
+  const dashboard = readFileSync('app/api/dashboard/agents/route.ts', 'utf8');
+  assert.match(source, /if \(!isMayarLive\(\)/);
+  assert.match(source, /\.limit\(2\)/);
+  assert.match(source, /verifyAgentSayaSettlement/);
+  assert.match(source, /finalize_mayar_agent_payment/);
+  assert.match(dashboard, /getSessionUser\(req\)/);
+  assert.ok(dashboard.indexOf('getSessionUser(req)') < dashboard.indexOf('recoverPendingMayarOrdersForOwner(user.email)'));
+});

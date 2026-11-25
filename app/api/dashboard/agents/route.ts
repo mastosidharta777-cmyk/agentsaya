@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSessionUser } from '@/lib/dashboard-session';
+import { recoverPendingMayarOrdersForOwner } from '@/lib/mayar-recovery';
 
 export async function GET(req: NextRequest) {
   const user = await getSessionUser(req);
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  // Reconcile on the customer's next signed-in visit after a closed payment tab.
+  await recoverPendingMayarOrdersForOwner(user.email);
 
   const { data: agents, error } = await supabaseAdmin
     .from('agents')
