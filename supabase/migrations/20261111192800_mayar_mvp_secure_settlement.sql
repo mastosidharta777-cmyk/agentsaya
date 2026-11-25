@@ -1,6 +1,5 @@
 -- Apply together with the Mayar checkout release, after backing up DB and verifying env.
 -- Do NOT run before switching server routes to service_role; public read scope changes.
-BEGIN;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS paid_at timestamptz;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS mayar_request_id uuid;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS mayar_initial_transaction_id uuid;
@@ -97,6 +96,7 @@ DROP POLICY IF EXISTS "anon_insert_transactions" ON public.transactions;
 DROP POLICY IF EXISTS "anon_update_transactions" ON public.transactions;
 DROP POLICY IF EXISTS "anon_select_transactions" ON public.transactions;
 DROP POLICY IF EXISTS "Allow full access for leads" ON public.leads;
+DROP POLICY IF EXISTS "public_chat_read" ON public.agents;
 CREATE POLICY "public_chat_read" ON public.agents FOR SELECT TO anon,authenticated
 USING (
   (payment_status='PAID' AND period_end > now())
@@ -104,7 +104,7 @@ USING (
 );
 REVOKE ALL ON public.agents, public.transactions, public.leads FROM PUBLIC,anon,authenticated;
 -- Revoke any legacy column-specific grants, not only table-level ACLs.
-DO $
+DO $$
 DECLARE t text; cols text;
 BEGIN
   FOREACH t IN ARRAY ARRAY['agents','transactions','leads'] LOOP
@@ -115,19 +115,19 @@ BEGIN
       cols, cols, cols, cols, t
     );
   END LOOP;
-END $;
+END $$;
 -- Older installations use visitor_name/contact_info/interest_summary.
 ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS customer_name text;
 ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS customer_phone text;
 ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS message_summary text;
 ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS source text DEFAULT 'chat';
-DO $
+DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='leads' AND column_name='contact_info') THEN
     EXECUTE 'ALTER TABLE public.leads ALTER COLUMN contact_info DROP NOT NULL';
     EXECUTE 'UPDATE public.leads SET customer_name=COALESCE(customer_name,visitor_name), customer_phone=COALESCE(customer_phone,contact_info), message_summary=COALESCE(message_summary,interest_summary)';
   END IF;
-END $;
+END $$;
 REVOKE ALL ON FUNCTION public.count_referrals(uuid) FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.get_referral_stats(uuid) FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.rls_auto_enable() FROM PUBLIC,anon,authenticated;
@@ -135,4 +135,3 @@ GRANT EXECUTE ON FUNCTION public.expire_trial() TO service_role;
 GRANT SELECT (agent_name,welcome_message,custom_agent_slug)
   ON public.agents TO anon,authenticated;
 -- Explicit service_role permissions remain as configured by Supabase.
-COMMIT;

@@ -82,6 +82,9 @@ test('database migration revokes public payment activation and owner data access
   assert.match(migration, /REVOKE SELECT \(%s\), INSERT \(%s\), UPDATE \(%s\), REFERENCES \(%s\)/);
   assert.match(migration, /REVOKE ALL ON FUNCTION public\.finalize_mayar_agent_payment/);
   assert.match(migration, /CREATE POLICY "public_chat_read"/);
+  assert.ok(migration.includes("DO $"));
+  assert.ok(!migration.includes("DO $\n"));
+  assert.ok(!migration.split("\n").some(line => ["BEGIN;","COMMIT;"].includes(line.trim())));
 });
 test('payment recovery is authenticated, bounded and cannot settle sandbox', () => {
   const source = readFileSync('lib/mayar-recovery.ts', 'utf8');
