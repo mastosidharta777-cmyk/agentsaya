@@ -29,22 +29,24 @@ export async function GET(req: NextRequest) {
     const isTrial = agent.payment_status === 'TRIAL';
     const now = new Date();
 
-    let expired = false;
+    let expired = !['PAID','TRIAL'].includes(agent.payment_status);
     let expiresAt: string | null = null;
     let daysRemaining: number | null = null;
 
     if (isTrial) {
       expiresAt = agent.trial_ends_at;
+      expired = !expiresAt;
       if (expiresAt) {
         const end = new Date(expiresAt);
-        expired = end < now;
+        expired = !(end > now);
         daysRemaining = Math.max(0, Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
       }
     } else if (agent.payment_status === 'PAID') {
       expiresAt = agent.period_end;
+      expired = !expiresAt;
       if (expiresAt) {
         const end = new Date(expiresAt);
-        expired = end < now;
+        expired = !(end > now);
         daysRemaining = Math.max(0, Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
       }
     }

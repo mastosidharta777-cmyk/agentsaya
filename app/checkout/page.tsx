@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase';
 import { CheckoutForm } from '@/components/CheckoutForm';
 
 interface CheckoutPageProps {
@@ -24,9 +24,9 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
     );
   }
 
-  const { data: agent } = await supabase
+  const { data: agent } = await supabaseAdmin
     .from('agents')
-    .select('id, agent_name, custom_agent_slug, owner_name, owner_email, owner_phone, payment_status, period_end, plan_tier, welcome_message, knowledge_base')
+    .select('id, agent_name, custom_agent_slug, payment_status, period_end, plan_tier')
     .eq('custom_agent_slug', slug)
     .maybeSingle();
 
@@ -76,11 +76,11 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
         <CheckoutForm
           slug={agent.custom_agent_slug}
           agentName={agent.agent_name}
-          welcomeMessage={agent.welcome_message || ''}
-          knowledgeBase={agent.knowledge_base || ''}
-          ownerName={agent.owner_name}
-          ownerEmail={agent.owner_email}
-          ownerPhone={agent.owner_phone}
+          welcomeMessage={''}
+          knowledgeBase={''}
+          ownerName={''}
+          ownerEmail={''}
+          ownerPhone={''}
           isRenewal={isRenewal}
           preselectedPlan={preselectedPlan}
         />

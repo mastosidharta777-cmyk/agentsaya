@@ -1,0 +1,24 @@
+name: Mayar MVP QA
+on:
+  pull_request:
+    branches: ['main']
+permissions:
+  contents: read
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: node --experimental-strip-types --test scripts/qa-mayar.test.mjs
+      - run: npm ci
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: qa-only-not-a-real-key
+          SUPABASE_SERVICE_ROLE_KEY: qa-only-not-a-real-key
+          MAYAR_ENV: disabled

@@ -51,36 +51,20 @@ function SuccessContent() {
       return;
     }
 
-    const isMockRef = typeof ref === 'string' && ref.startsWith('MOCK-');
-    const isDev = process.env.NODE_ENV === 'development';
-
-    if ((isMockRef || isDev) && slugParam) {
-      setData({
-        status: 'PAID',
-        slug: slugParam,
-        agentName: null,
-        paymentStatus: 'PAID',
-        periodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        trialEndsAt: null,
-        planType: 'basic',
-      });
-      setLoading(false);
-      return;
-    }
-
-    // Handle trial flow - no need to poll transaction status
+    // A trial must be confirmed by the server, not manufactured from query parameters.
     if (ref === 'trial' && slugParam) {
-      setData({
-        status: 'TRIAL',
-        slug: slugParam,
-        agentName: null,
-        paymentStatus: 'TRIAL',
-        periodEnd: null,
-        trialEndsAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-        planType: 'trial',
-      });
-      setLoading(false);
-      return;
+      let active = true;
+      void (async () => {
+        try {
+          const res = await fetch('/api/agent/status?slug=' + encodeURIComponent(slugParam), { cache: 'no-store' });
+          const result = await res.json();
+          if (!res.ok || result.paymentStatus !== 'TRIAL' || result.expired || !result.expiresAt) throw new Error('Trial tidak aktif.');
+          if (active) setData({ status: 'TRIAL', slug: slugParam, agentName: result.agentName,
+            paymentStatus: 'TRIAL', periodEnd: null, trialEndsAt: result.expiresAt, planType: 'trial' });
+        } catch { if (active) setError('Trial tidak ditemukan atau sudah berakhir.'); }
+        finally { if (active) setLoading(false); }
+      })();
+      return () => { active = false; };
     }
 
     // Handle paid flow - poll transaction status
@@ -89,7 +73,7 @@ function SuccessContent() {
       for (let i = 0; i < 6; i++) {
         try {
           const res = await fetch(
-            `/api/transaction/status?merchantRef=${ref}`
+            `/api/transaction/status?merchantRef=${encodeURIComponent(ref)}`
           );
           if (!res.ok) {
             const errorText = await res.text();
